@@ -9,13 +9,37 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Siapkan Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -r requirements.txt pyinstaller
-      - run: pyinstaller --noconfirm --clean --windowed --name "Bagi-Layar" main.py
-      - uses: actions/upload-artifact@v4
+
+      - name: Ambil source ke folder aman
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'bagi-layar-source.zip'
+          $dst = Join-Path $env:RUNNER_TEMP 'bagi-layar-source'
+          if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
+          Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/archive/${{ github.sha }}.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dst -Force
+          $src = Get-ChildItem $dst -Directory | Select-Object -First 1
+          "APP_SOURCE=$($src.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Instal dependency build
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: python -m pip install -r "$env:APP_SOURCE\requirements.txt" pyinstaller
+
+      - name: Build portable folder
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          Set-Location $env:APP_SOURCE
+          pyinstaller --noconfirm --clean --windowed --name "Bagi-Layar" main.py
+
+      - name: Upload portable
+        uses: actions/upload-artifact@v4
         with:
           name: Bagi-Layar-Windows-Portable
-          path: dist/Bagi-Layar/
+          path: ${{ env.APP_SOURCE }}/dist/Bagi-Layar/
