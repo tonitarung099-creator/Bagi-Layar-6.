@@ -42,15 +42,17 @@ def list_windows(exclude_handle: int | None = None) -> list[WindowInfo]:
     EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
 
     def callback(hwnd, _lparam):
-        if exclude_handle and int(hwnd) == int(exclude_handle):
+        handle = int(hwnd)
+        if exclude_handle and handle == int(exclude_handle):
             return True
-        if not user32.IsWindowVisible(hwnd):
+        if not user32.IsWindowVisible(hwnd) or user32.GetParent(hwnd):
             return True
-        if user32.GetParent(hwnd):
-            return True
-        ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        if ex_style & WS_EX_TOOLWINDOW:
-            return True
+        try:
+            ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            if ex_style & WS_EX_TOOLWINDOW:
+                return True
+        except Exception:
+            pass
         length = user32.GetWindowTextLengthW(hwnd)
         if length <= 0:
             return True
@@ -61,10 +63,11 @@ def list_windows(exclude_handle: int | None = None) -> list[WindowInfo]:
             return True
         class_buf = ctypes.create_unicode_buffer(256)
         user32.GetClassNameW(hwnd, class_buf, 256)
-        windows.append(WindowInfo(int(hwnd), title, class_buf.value))
+        windows.append(WindowInfo(handle, title, class_buf.value))
         return True
 
-    user32.EnumWindows(EnumWindowsProc(callback), 0)
+    callback_ref = EnumWindowsProc(callback)
+    user32.EnumWindows(callback_ref, 0)
     return windows
 
 
@@ -73,17 +76,19 @@ def move_window(handle: int, rect: Rect) -> bool:
         return False
     hwnd = wintypes.HWND(handle)
     try:
-        user32.ShowWindow(hwnd, SW_RESTORE)
-        return bool(
-            user32.SetWindowPos(
-                hwnd,
-                0,
-                int(rect.x),
-                int(rect.y),
-                int(rect.width),
-                int(rect.height),
-                SWP_NOZORDER | SWP_NOACTIVATE,
-            )
-        )
+        if not user32.IsWindow(hwnd):
+            return False
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, SW_RESTORE)
+        return bool(user32.SetWindowPos(hwnd, 0, int(rect.x), int(rect.y), max(1, int(rect.width)), max(1, int(rect.height)), SWP_NOZORDER | SWP_NOACTIVATE))
+    except Exception:
+        return False
+
+
+def window_exists(handle: int) -> bool:
+    if not IS_WINDOWS:
+        return False
+    try:
+        return bool(user32.IsWindow(wintypes.HWND(handle)))
     except Exception:
         return False
