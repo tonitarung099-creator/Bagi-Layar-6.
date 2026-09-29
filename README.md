@@ -33,11 +33,13 @@ Aplikasi Windows untuk membagi dan menyusun jendela ke beberapa slot pada satu a
 - Kunci layout bekerja lintas monitor; monitor yang Kunci Layout-nya nonaktif tidak dipaksa kembali.
 - Saat drag manual berlangsung, kunci layout dijeda sementara agar tidak melawan gerakan pengguna.
 - Mode system tray: minimize atau klik X menyembunyikan UI, tetapi engine zona/hotkey tetap aktif.
-- Menu tray menyediakan **Buka Bagi Layar**, toggle **Zona Drag**, toggle **Hotkey Ctrl+Alt+1…9**, dan **Keluar Bagi Layar**.
+- Menu tray menyediakan **Buka Bagi Layar**, toggle **Zona Drag**, toggle **Hotkey Ctrl+Alt+1…9**, **Mulai bersama Windows**, dan **Keluar Bagi Layar**.
+- Opsi **Mulai bersama Windows** memakai startup per-user, tidak membutuhkan administrator atau installer.
+- Saat auto-start, Bagi Layar langsung masuk tray menggunakan argumen `--tray` sehingga jendela utama tidak mengganggu saat login Windows.
 - Preferensi toggle zona/hotkey diingat menggunakan pengaturan aplikasi.
 - Simpan dan pulihkan banyak workspace.
 - UI Bahasa Indonesia.
-- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor/system-tray, tes engine layout, lalu build portable Windows.
+- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor/system-tray/auto-start, tes engine layout, lalu build portable Windows.
 
 ## Cara pakai multi-monitor
 
@@ -63,9 +65,18 @@ Pada Windows yang memiliki system tray:
    - membuka Bagi Layar;
    - mengaktifkan/nonaktifkan **Zona Drag**;
    - mengaktifkan/nonaktifkan **Hotkey Ctrl+Alt+1…9**;
+   - mengaktifkan/nonaktifkan **Mulai bersama Windows**;
    - benar-benar keluar melalui **Keluar Bagi Layar**.
 
 Jika system tray tidak tersedia, perilaku close kembali normal dan aplikasi tidak memaksa berjalan di background.
+
+## Mulai bersama Windows
+
+Aktifkan **Mulai bersama Windows** dari menu klik kanan ikon tray. Bagi Layar menambahkan entri startup hanya untuk akun Windows saat ini (`HKCU`), sehingga tidak membutuhkan hak administrator.
+
+Karena aplikasi bersifat portable, auto-start menunjuk ke lokasi `Bagi-Layar.exe` saat opsi tersebut diaktifkan. Jika folder portable dipindahkan, nonaktifkan lalu aktifkan lagi **Mulai bersama Windows** agar lokasi startup diperbarui.
+
+Saat Windows login, aplikasi dipanggil dengan `--tray`: UI utama tidak langsung dibuka, tetapi engine multi-monitor, zona drag, hotkey, dan Kunci Layout dapat tetap berjalan di background.
 
 ## Cara pakai cepat
 
@@ -100,4 +111,4 @@ Hasil build berada di `dist\Bagi-Layar\`. Folder tersebut dapat dipindah dan dij
 
 ## Catatan
 
-UI dapat dibuka di OS lain untuk pengembangan, tetapi fungsi memindahkan/resize jendela, overlay zona otomatis, hotkey global, dan system tray ditujukan untuk Windows.
+UI dapat dibuka di OS lain untuk pengembangan, tetapi fungsi memindahkan/resize jendela, overlay zona otomatis, hotkey global, system tray, dan auto-start ditujukan untuk Windows.
