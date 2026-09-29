@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import unittest
 from copy import deepcopy
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -204,7 +204,7 @@ class SolRegressionTests(unittest.TestCase):
 
     def test_B09_cancel_custom_restores_layout_highlight(self):
         self.win._select_layout(6)
-        self.win.layout_buttons[0].setChecked(True)  # state yang terjadi saat tombol Kustom diklik
+        self.win.layout_buttons[0].setChecked(True)
         with patch("app.sol_app_window.QInputDialog.getInt", return_value=(2, False)):
             self.win._select_custom()
         self.assertEqual(self.win.layout_count, 6)
@@ -212,13 +212,17 @@ class SolRegressionTests(unittest.TestCase):
         self.assertFalse(self.win.layout_buttons[0].isChecked())
 
     def test_B10_sidebar_navigation_is_exclusive_and_actionable(self):
+        self.win.show()
+        APP.processEvents()
         self.win.nav_buttons[1].click()
+        APP.processEvents()
         checked = [b.isChecked() for b in self.win.nav_buttons]
         self.assertEqual(checked, [False, True, False])
-        self.assertTrue(self.win.window_list.hasFocus())
+        self.assertIs(APP.focusWidget(), self.win.window_list)
         self.win.nav_buttons[2].click()
+        APP.processEvents()
         self.assertEqual([b.isChecked() for b in self.win.nav_buttons], [False, False, True])
-        self.assertTrue(self.win.arrange_action.hasFocus())
+        self.assertIs(APP.focusWidget(), self.win.arrange_action)
 
     def test_B11_refresh_removes_only_truly_dead_hwnd(self):
         key = self.win._screen_key(self.win.selected_monitor)
