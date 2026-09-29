@@ -11,6 +11,8 @@ from app.window_manager import IS_WINDOWS, WindowInfo, get_foreground_window
 
 
 def run() -> int:
+    start_hidden = "--tray" in sys.argv
+
     app = QApplication(sys.argv)
     app.setApplicationName("Bagi Layar")
     app.setOrganizationName("ToniTools")
@@ -28,7 +30,8 @@ def run() -> int:
         widget.style().unpolish(widget)
         widget.style().polish(widget)
 
-    win.show()
+    if not start_hidden:
+        win.show()
 
     def move_foreground_to_slot(slot: int) -> None:
         targets = win._targets()
@@ -52,6 +55,7 @@ def run() -> int:
                 f"Hotkey: {active.title[:28]} → Monitor {win.selected_monitor + 1}, Slot {slot + 1}"
             )
 
+    # winId() sengaja dipanggil walau start_hidden agar RegisterHotKey mendapat HWND valid.
     hotkeys = HotkeyController(app, int(win.winId()), move_foreground_to_slot, 9)
     win.hotkey_controller = hotkeys
 
@@ -76,6 +80,13 @@ def run() -> int:
     win.tray_controller = tray
     app.aboutToQuit.connect(tray.close)
 
+    if start_hidden:
+        if tray.available:
+            win.hide()
+        else:
+            # Jangan biarkan aplikasi tidak terlihat jika system tray tidak tersedia.
+            win.show()
+
     if IS_WINDOWS:
         zone_text = "Zona aktif" if tray.zone_action.isChecked() else "Zona nonaktif"
         if tray.hotkey_action.isChecked():
@@ -83,8 +94,9 @@ def run() -> int:
         else:
             hotkey_text = "Hotkey nonaktif"
         tray_text = "Tray aktif" if tray.available else "Tray tidak tersedia"
+        startup_text = "Auto-start aktif" if tray.startup_action.isChecked() else "Auto-start nonaktif"
         win.status_label.setText(
-            f"Multi-monitor • {zone_text} • {hotkey_text} • {tray_text}"
+            f"Multi-monitor • {zone_text} • {hotkey_text} • {tray_text} • {startup_text}"
         )
 
     return app.exec()
