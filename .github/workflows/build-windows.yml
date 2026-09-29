@@ -3,7 +3,9 @@ name: Build Windows Portable
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'sol/**'
 
 jobs:
   build:
@@ -31,25 +33,25 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: python -m pip install -r "$env:APP_SOURCE\requirements.txt" pyinstaller
 
-      - name: Validasi source dan UI
+      - name: Validasi source dan UI produksi
         shell: pwsh
         working-directory: ${{ runner.temp }}
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
           Set-Location $env:APP_SOURCE
-          python -m compileall -q app main.py
-          python -c "from app.main_window import MainWindow; from app.widgets import MonitorPreview, WindowListWidget; print('Base UI imports OK')"
+          python -m compileall -q app tools main.py
+          python -c "from app.sol_app_window import AppMainWindow, MultiMonitorDragZoneController; from app.reference_widgets import ToggleSwitch, ReferenceMonitorPreview; print('Sol production UI imports OK')"
+          python -c "from PySide6.QtWidgets import QApplication; from app.sol_app_window import AppMainWindow; app=QApplication([]); win=AppMainWindow(); win.lock_timer.stop(); assert len(win._targets()) >= 1; assert win.minimumWidth() <= 1080; assert callable(win.restore_missing_workspace_windows); assert win.nav_group.exclusive(); win.close(); print('Hardened production window OK')"
           python -c "from PySide6.QtWidgets import QApplication; from app.zone_overlay import ZoneOverlay; app=QApplication([]); overlay=ZoneOverlay(); overlay.close(); print('Zone overlay OK')"
-          python -c "from app.multi_monitor import MultiMonitorMainWindow, MultiMonitorDragZoneController; p=MultiMonitorMainWindow._normalize_profile({'layout_count':4,'margin':9,'gap':7}); assert p['layout_count']==4 and p['margin']==9 and p['gap']==7; print('Multi-monitor profile OK')"
-          python -c "from PySide6.QtWidgets import QApplication; from app.app_window import AppMainWindow; app=QApplication([]); win=AppMainWindow(); assert len(win._targets()) >= 1; assert win._monitor_index_for_key('__monitor_offline__', -1) == -1; assert win._connected_monitor_index_for_key('__monitor_offline__') == -1; assert callable(win.restore_missing_workspace_windows); win.close(); print('Hardened multi-monitor window OK')"
+          python -c "from app.multi_monitor import MultiMonitorMainWindow; p=MultiMonitorMainWindow._normalize_profile({'layout_count':4,'margin':9,'gap':7}); assert p['layout_count']==4 and p['margin']==9 and p['gap']==7; print('Multi-monitor profile OK')"
           python -c "from pathlib import Path; from app.paths import config_dir; from app.storage import Storage; cfg=config_dir(); store=Storage(); assert cfg.name.lower()=='config'; assert store.path.parent==cfg; print('Portable config path OK:', cfg)"
-          python -c "from PySide6.QtWidgets import QApplication; from pathlib import Path; from app.app_window import AppMainWindow; from app.tray import TrayController; app=QApplication([]); win=AppMainWindow(); tray=TrayController(app,win,None,None); assert tray.open_action.text()=='Buka Bagi Layar'; assert tray.workspace_menu.title()=='Workspace Cepat'; assert tray.monitor_menu.title()=='Target Monitor Hotkey'; assert tray.auto_restore_action.text()=='Pulihkan workspace otomatis saat mulai'; assert tray.workspace_watch_action.text()=='Pantau workspace terus-menerus'; assert tray.startup_action.text()=='Mulai bersama Windows'; assert Path(tray.settings.fileName()).parent.name.lower()=='config'; tray.close(); win.close(); print('System tray controller OK')"
-          python -c "from PySide6.QtWidgets import QApplication; from app.app_window import AppMainWindow; from app.auto_restore import StartupWorkspaceRestorer; from app.workspace_watch import WorkspaceWatchController; app=QApplication([]); win=AppMainWindow(); auto=StartupWorkspaceRestorer(win); watch=WorkspaceWatchController(win); assert auto.max_attempts==18 and auto.retry_interval_ms==5000; assert watch.interval_ms==4000; watch.close(); auto.close(); win.close(); print('Workspace recovery controllers OK')"
+          python -c "from PySide6.QtWidgets import QApplication; from pathlib import Path; from app.sol_app_window import AppMainWindow; from app.tray import TrayController; app=QApplication([]); win=AppMainWindow(); win.lock_timer.stop(); tray=TrayController(app,win,None,None); assert tray.open_action.text()=='Buka Bagi Layar'; assert tray.workspace_menu.title()=='Workspace Cepat'; assert tray.monitor_menu.title()=='Target Monitor Hotkey'; assert tray.auto_restore_action.text()=='Pulihkan workspace otomatis saat mulai'; assert tray.workspace_watch_action.text()=='Pantau workspace terus-menerus'; assert tray.startup_action.text()=='Mulai bersama Windows'; assert Path(tray.settings.fileName()).parent.name.lower()=='config'; tray.close(); win.close(); print('System tray controller OK')"
+          python -c "from PySide6.QtWidgets import QApplication; from app.sol_app_window import AppMainWindow; from app.auto_restore import StartupWorkspaceRestorer; from app.workspace_watch import WorkspaceWatchController; app=QApplication([]); win=AppMainWindow(); win.lock_timer.stop(); auto=StartupWorkspaceRestorer(win); watch=WorkspaceWatchController(win); assert auto.max_attempts==18 and auto.retry_interval_ms==5000; assert watch.interval_ms==4000; watch.close(); auto.close(); win.close(); print('Workspace recovery controllers OK')"
           python -c "from app.startup import startup_command; cmd=startup_command(); assert '--tray' in cmd; print('Portable auto-start command OK:', cmd)"
           python -c "from PySide6.QtWidgets import QApplication; from app.single_instance import SingleInstanceManager; app=QApplication([]); a=SingleInstanceManager(); assert a.acquire_or_notify(); b=SingleInstanceManager(); assert not b.acquire_or_notify(); [app.processEvents() for _ in range(5)]; assert a.consume_pending_show(); a.close(); print('Single-instance IPC OK')"
 
-      - name: Tes engine layout
+      - name: Tes engine dan regression Astra B01-B11
         shell: pwsh
         working-directory: ${{ runner.temp }}
         env:
@@ -57,6 +59,22 @@ jobs:
         run: |
           Set-Location $env:APP_SOURCE
           python -m unittest discover -s tests -v
+
+      - name: Render screenshot fixture UI
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          Set-Location $env:APP_SOURCE
+          python tools/render_ui_snapshots.py
+          Get-ChildItem artifacts\ui
+
+      - name: Upload screenshot UI
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bagi-Layar-UI-Snapshots
+          path: ${{ env.APP_SOURCE }}/artifacts/ui/
 
       - name: Build portable folder
         shell: pwsh
@@ -69,9 +87,13 @@ jobs:
             "Folder konfigurasi portable Bagi Layar.",
             "workspace.json dan settings.ini akan dibuat otomatis di folder ini."
           ) | Set-Content -Path "dist\Bagi-Layar\config\README.txt" -Encoding UTF8
+          $zip = "dist\Bagi-Layar-Windows-Portable.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "dist\Bagi-Layar\*" -DestinationPath $zip -CompressionLevel Optimal
+          if (-not (Test-Path $zip)) { throw "ZIP portable tidak terbentuk" }
 
-      - name: Upload portable
+      - name: Upload portable ZIP
         uses: actions/upload-artifact@v4
         with:
           name: Bagi-Layar-Windows-Portable
-          path: ${{ env.APP_SOURCE }}/dist/Bagi-Layar/
+          path: ${{ env.APP_SOURCE }}/dist/Bagi-Layar-Windows-Portable.zip
