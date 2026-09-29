@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QObject, QSettings, QTimer, Signal
+from PySide6.QtGui import QGuiApplication
 
 from .paths import config_file
 
 
 class StartupWorkspaceRestorer(QObject):
-    """Pulihkan workspace aktif saat aplikasi mulai, dengan retry untuk app yang terlambat terbuka."""
+    """Pulihkan workspace aktif saat mulai dan ketika monitor kembali tersambung."""
 
     progress = Signal(int, int, int)
     completed = Signal(bool, int, int)
@@ -35,6 +36,12 @@ class StartupWorkspaceRestorer(QObject):
         self.timer.timeout.connect(self._attempt_restore)
         self.attempt = 0
         self.running = False
+        self._gui_app = QGuiApplication.instance()
+        if self._gui_app is not None:
+            try:
+                self._gui_app.screenAdded.connect(self._screen_added)
+            except Exception:
+                pass
 
     def is_enabled(self) -> bool:
         return self.settings.value("auto_restore_workspace", False, bool)
@@ -61,6 +68,12 @@ class StartupWorkspaceRestorer(QObject):
         self.timer.stop()
         self.running = False
         self.attempt = 0
+
+    def _screen_added(self, _screen) -> None:
+        # QScreen sudah terdaftar di QApplication ketika sinyal ini diterima.
+        # Beri jeda sedikit agar geometry/profile monitor stabil lebih dulu.
+        if self.is_enabled():
+            self.start(1500)
 
     def expected_slots(self) -> int:
         storage = getattr(self.window, "storage", None)
@@ -144,4 +157,9 @@ class StartupWorkspaceRestorer(QObject):
 
     def close(self) -> None:
         self.stop()
+        if self._gui_app is not None:
+            try:
+                self._gui_app.screenAdded.disconnect(self._screen_added)
+            except Exception:
+                pass
         self.settings.sync()
