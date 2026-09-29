@@ -18,6 +18,7 @@ class WindowInfo:
 IS_WINDOWS = os.name == "nt"
 WM_HOTKEY = 0x0312
 HOTKEY_BASE_ID = 0xB600
+VK_LBUTTON = 0x01
 
 if IS_WINDOWS:
     user32 = ctypes.windll.user32
@@ -100,6 +101,47 @@ def get_foreground_window(exclude_handle: int | None = None) -> WindowInfo | Non
         if not hwnd:
             return None
         return _window_info(int(hwnd), exclude_handle)
+    except Exception:
+        return None
+
+
+def get_cursor_position() -> tuple[int, int] | None:
+    """Posisi pointer global Windows dalam koordinat virtual desktop."""
+    if not IS_WINDOWS:
+        return None
+    point = wintypes.POINT()
+    try:
+        if not user32.GetCursorPos(ctypes.byref(point)):
+            return None
+        return int(point.x), int(point.y)
+    except Exception:
+        return None
+
+
+def is_left_button_down() -> bool:
+    if not IS_WINDOWS:
+        return False
+    try:
+        return bool(user32.GetAsyncKeyState(VK_LBUTTON) & 0x8000)
+    except Exception:
+        return False
+
+
+def get_window_rect(handle: int) -> Rect | None:
+    if not IS_WINDOWS:
+        return None
+    rect = wintypes.RECT()
+    try:
+        if not user32.IsWindow(wintypes.HWND(handle)):
+            return None
+        if not user32.GetWindowRect(wintypes.HWND(handle), ctypes.byref(rect)):
+            return None
+        return Rect(
+            int(rect.left),
+            int(rect.top),
+            max(1, int(rect.right - rect.left)),
+            max(1, int(rect.bottom - rect.top)),
+        )
     except Exception:
         return None
 
