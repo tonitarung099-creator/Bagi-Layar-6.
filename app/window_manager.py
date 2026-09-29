@@ -47,6 +47,28 @@ if IS_WINDOWS:
     MOD_NOREPEAT = 0x4000
     PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
+    # ctypes memakai c_int sebagai return type default. HANDLE Windows 64-bit harus
+    # dideklarasikan eksplisit agar OpenProcess tidak terpotong di build x64.
+    try:
+        user32.GetWindowThreadProcessId.argtypes = [
+            wintypes.HWND,
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.QueryFullProcessImageNameW.argtypes = [
+            wintypes.HANDLE,
+            wintypes.DWORD,
+            wintypes.LPWSTR,
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+    except Exception:
+        pass
+
 
 def _is_cloaked(hwnd) -> bool:
     """True untuk surface Windows/UWP tersembunyi yang bukan jendela nyata pengguna."""
