@@ -9,6 +9,8 @@ rmdir /s /q dist 2>nul
 pyinstaller --noconfirm --clean --windowed --name "Bagi-Layar" main.py
 if exist "dist\Bagi-Layar" (
   if not exist "dist\Bagi-Layar\config" mkdir "dist\Bagi-Layar\config"
+  >"dist\Bagi-Layar\config\README.txt" echo Folder konfigurasi portable Bagi Layar.
+  >>"dist\Bagi-Layar\config\README.txt" echo workspace.json dan settings.ini akan dibuat otomatis di folder ini.
   echo.
   echo Build selesai: dist\Bagi-Layar\Bagi-Layar.exe
   echo Config portable: dist\Bagi-Layar\config\
