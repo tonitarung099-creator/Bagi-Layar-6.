@@ -20,18 +20,24 @@ jobs:
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           $zip = Join-Path $env:RUNNER_TEMP 'bagi-layar-source.zip'
           $dst = Join-Path $env:RUNNER_TEMP 'bagi-layar-source'
           if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
           Invoke-WebRequest -Uri "https://github.com/${{ github.repository }}/archive/${{ github.sha }}.zip" -OutFile $zip
           Expand-Archive -Path $zip -DestinationPath $dst -Force
           $src = Get-ChildItem $dst -Directory | Select-Object -First 1
+          if (-not $src) { throw 'Source hasil extract tidak ditemukan' }
           "APP_SOURCE=$($src.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Instal dependency build
         shell: pwsh
         working-directory: ${{ runner.temp }}
-        run: python -m pip install -r "$env:APP_SOURCE\requirements.txt" pyinstaller
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install -r "$env:APP_SOURCE\requirements.txt" pyinstaller
 
       - name: Validasi source dan UI produksi
         shell: pwsh
@@ -39,6 +45,8 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           Set-Location $env:APP_SOURCE
           python -m compileall -q app tools main.py
           python -c "from app.sol_app_window import AppMainWindow, MultiMonitorDragZoneController; from app.reference_widgets import ToggleSwitch, ReferenceMonitorPreview; print('Sol production UI imports OK')"
@@ -57,6 +65,8 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           Set-Location $env:APP_SOURCE
           python -m unittest discover -s tests -v
 
@@ -66,6 +76,8 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           Set-Location $env:APP_SOURCE
           python tools/render_ui_snapshots.py
           Get-ChildItem artifacts\ui
@@ -80,6 +92,8 @@ jobs:
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           Set-Location $env:APP_SOURCE
           pyinstaller --noconfirm --clean --windowed --name "Bagi-Layar" main.py
           New-Item -ItemType Directory -Force -Path "dist\Bagi-Layar\config" | Out-Null
