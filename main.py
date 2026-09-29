@@ -3,8 +3,9 @@ import sys
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
+from app.app_window import AppMainWindow
 from app.hotkeys import HotkeyController
-from app.multi_monitor import MultiMonitorDragZoneController, MultiMonitorMainWindow
+from app.multi_monitor import MultiMonitorDragZoneController
 from app.single_instance import SingleInstanceManager
 from app.theme import STYLE
 from app.tray import TrayController
@@ -27,7 +28,7 @@ def run() -> int:
     if not single_instance.acquire_or_notify(show_existing=not start_hidden):
         return 0
 
-    win = MultiMonitorMainWindow()
+    win = AppMainWindow()
     win.workspace_list.setObjectName("WorkspaceList")
     win.window_list.setObjectName("WindowList")
     win.lock_button.setObjectName("LockToggle")
