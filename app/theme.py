@@ -107,6 +107,13 @@ QListWidget::item:selected {
     background: #dceaff;
     border: 1px solid #8ebaff;
 }
+#WorkspaceList::item {
+    min-height: 28px;
+}
+#WindowList::item {
+    min-height: 38px;
+    padding: 8px 9px;
+}
 
 QPushButton#LayoutPreset {
     background: #ffffff;
@@ -161,6 +168,26 @@ QSlider::handle:horizontal {
 QSlider::sub-page:horizontal {
     background: #1779ee;
     border-radius: 2px;
+}
+
+#LockToggle {
+    min-height: 24px;
+    min-width: 66px;
+    border: 1px solid #ccd6e3;
+    border-radius: 12px;
+    padding: 2px 9px;
+    background: #e9eef5;
+    color: #6b7482;
+    font-size: 10px;
+    font-weight: 600;
+}
+#LockToggle:hover {
+    border-color: #9dbce6;
+}
+#LockToggle:checked {
+    border-color: #1478f5;
+    background: #1478f5;
+    color: #ffffff;
 }
 
 #ActionCard {
