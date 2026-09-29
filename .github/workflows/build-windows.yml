@@ -43,6 +43,7 @@ jobs:
           python -c "from PySide6.QtWidgets import QApplication; from app.zone_overlay import ZoneOverlay; app=QApplication([]); overlay=ZoneOverlay(); overlay.close(); print('Zone overlay OK')"
           python -c "from app.multi_monitor import MultiMonitorMainWindow, MultiMonitorDragZoneController; p=MultiMonitorMainWindow._normalize_profile({'layout_count':4,'margin':9,'gap':7}); assert p['layout_count']==4 and p['margin']==9 and p['gap']==7; print('Multi-monitor profile OK')"
           python -c "from PySide6.QtWidgets import QApplication; from app.multi_monitor import MultiMonitorMainWindow; app=QApplication([]); win=MultiMonitorMainWindow(); assert len(win._targets()) >= 1; win.close(); print('Multi-monitor window OK')"
+          python -c "from PySide6.QtWidgets import QApplication; from app.multi_monitor import MultiMonitorMainWindow; from app.tray import TrayController; app=QApplication([]); win=MultiMonitorMainWindow(); tray=TrayController(app,win,None,None); assert tray.open_action.text()=='Buka Bagi Layar'; tray.close(); win.close(); print('System tray controller OK')"
 
       - name: Tes engine layout
         shell: pwsh
