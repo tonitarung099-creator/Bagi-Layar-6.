@@ -11,6 +11,7 @@ from app.single_instance import SingleInstanceManager
 from app.theme import STYLE
 from app.tray import TrayController
 from app.window_manager import IS_WINDOWS, WindowInfo, get_foreground_window
+from app.workspace_watch import WorkspaceWatchController
 
 
 def run() -> int:
@@ -97,6 +98,14 @@ def run() -> int:
     win.auto_restore_controller = auto_restore
     app.aboutToQuit.connect(auto_restore.close)
 
+    # Watcher jangka panjang hanya mengisi slot yang kosong/stale. Ia otomatis
+    # menunggu jika auto-restore startup sedang melakukan retry penuh.
+    workspace_watch = WorkspaceWatchController(win)
+    tray.bind_workspace_watch(workspace_watch)
+    workspace_watch.recovered.connect(tray.notify_workspace_recovered)
+    win.workspace_watch_controller = workspace_watch
+    app.aboutToQuit.connect(workspace_watch.close)
+
     # Instance kedua yang dibuka manual membawa instance lama ke depan.
     single_instance.show_requested.connect(tray.show_window)
     if single_instance.consume_pending_show():
@@ -113,6 +122,7 @@ def run() -> int:
 
     # Timer baru mulai setelah seluruh engine/tray siap.
     auto_restore.start_if_enabled()
+    workspace_watch.start_if_enabled()
 
     if IS_WINDOWS:
         zone_text = "Zona aktif" if tray.zone_action.isChecked() else "Zona nonaktif"
@@ -127,9 +137,14 @@ def run() -> int:
             if tray.auto_restore_action.isChecked()
             else "Auto-restore nonaktif"
         )
+        watch_text = (
+            "Pantau workspace aktif"
+            if tray.workspace_watch_action.isChecked()
+            else "Pantau workspace nonaktif"
+        )
         win.status_label.setText(
             f"Multi-monitor • {zone_text} • {hotkey_text} • {tray_text} • "
-            f"{startup_text} • {restore_text} • Single-instance"
+            f"{startup_text} • {restore_text} • {watch_text} • Single-instance"
         )
 
     return app.exec()
