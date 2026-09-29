@@ -6,17 +6,32 @@ from pathlib import Path
 
 from PySide6.QtCore import QStandardPaths
 
+from .paths import config_file
+
 
 DEFAULT_WORKSPACES = ["ChatGPT 6 Runner", "Kerja Harian", "Desain & Riset"]
 
 
 class Storage:
-    """Penyimpanan workspace dengan migrasi dari format v1 lama."""
+    """Penyimpanan workspace portable dengan migrasi format/lokasi lama."""
 
     def __init__(self) -> None:
-        base = Path(QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation))
-        base.mkdir(parents=True, exist_ok=True)
-        self.path = base / "workspace.json"
+        self.path = config_file("workspace.json")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._migrate_legacy_location()
+
+    def _migrate_legacy_location(self) -> None:
+        if self.path.exists():
+            return
+        old_base = Path(
+            QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation)
+        )
+        old_path = old_base / "workspace.json"
+        try:
+            if old_path.exists() and old_path.resolve() != self.path.resolve():
+                self.path.write_bytes(old_path.read_bytes())
+        except Exception:
+            pass
 
     def _read_raw(self) -> dict:
         if not self.path.exists():
@@ -42,7 +57,9 @@ class Storage:
         if raw:
             old_name = str(raw.get("workspace") or DEFAULT_WORKSPACES[0])
             old_name = old_name.replace("▣", "").strip() or DEFAULT_WORKSPACES[0]
-            workspaces[old_name] = {key: deepcopy(value) for key, value in raw.items() if key != "workspace"}
+            workspaces[old_name] = {
+                key: deepcopy(value) for key, value in raw.items() if key != "workspace"
+            }
             active = old_name
         else:
             active = DEFAULT_WORKSPACES[0]
