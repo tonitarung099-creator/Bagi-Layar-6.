@@ -21,7 +21,7 @@ def run() -> int:
     app.setOrganizationName("ToniTools")
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
-    app.setFont(QFont("Segoe UI Variable Text", 10))
+    app.setFont(QFont("Segoe UI", 10))
 
     single_instance = SingleInstanceManager(app)
     if not single_instance.acquire_or_notify(show_existing=not start_hidden):

@@ -62,7 +62,7 @@ def main() -> int:
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
-    app.setFont(QFont("Segoe UI Variable Text", 10))
+    app.setFont(QFont("Segoe UI", 10))
     out = ROOT / "artifacts" / "ui"
     out.mkdir(parents=True, exist_ok=True)
 

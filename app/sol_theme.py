@@ -2,7 +2,7 @@ STYLE = r"""
 QMainWindow, QWidget {
     background: #f3f7fc;
     color: #162033;
-    font-family: "Segoe UI Variable Text", "Segoe UI";
+    font-family: "Segoe UI";
     font-size: 12px;
 }
 QLabel { background: transparent; }
