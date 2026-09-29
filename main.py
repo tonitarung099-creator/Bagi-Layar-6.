@@ -6,7 +6,8 @@ from PySide6.QtWidgets import QApplication
 from app.hotkeys import HotkeyController
 from app.main_window import MainWindow
 from app.theme import STYLE
-from app.window_manager import IS_WINDOWS, get_foreground_window
+from app.window_manager import IS_WINDOWS, WindowInfo, get_foreground_window
+from app.zone_overlay import WindowDragZoneController
 
 
 def run() -> int:
@@ -54,12 +55,31 @@ def run() -> int:
     # Simpan referensi agar native event filter tidak di-GC selama aplikasi hidup.
     win.hotkey_controller = hotkeys
 
+    def snap_dragged_window(active: WindowInfo, slot: int, monitor_index: int) -> None:
+        screens = QApplication.screens()
+        if not screens:
+            return
+        monitor_index = max(0, min(monitor_index, len(screens) - 1))
+        win._select_monitor(monitor_index)
+        if win._move_window_to_slot(active, slot):
+            win.refresh_windows()
+            win._select_handle_in_list(active.handle)
+            win.status_label.setText(
+                f"Zona: {active.title[:30]} → Monitor {monitor_index + 1}, Slot {slot + 1}"
+            )
+
+    zones = WindowDragZoneController(win, snap_dragged_window)
+    win.zone_controller = zones
+    app.aboutToQuit.connect(zones.close)
+
     if IS_WINDOWS:
         if hotkeys.registered_count == 9:
-            win.status_label.setText("Hotkey global aktif: Ctrl+Alt+1 sampai Ctrl+Alt+9")
+            win.status_label.setText(
+                "Zona drag aktif • Hotkey Ctrl+Alt+1 sampai Ctrl+Alt+9"
+            )
         else:
             win.status_label.setText(
-                f"Hotkey global aktif {hotkeys.registered_count}/9 • sebagian kombinasi dipakai aplikasi lain"
+                f"Zona drag aktif • Hotkey {hotkeys.registered_count}/9 tersedia"
             )
 
     return app.exec()
