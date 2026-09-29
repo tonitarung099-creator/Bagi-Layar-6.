@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QApplication
 from app.hotkeys import HotkeyController
 from app.multi_monitor import MultiMonitorDragZoneController, MultiMonitorMainWindow
 from app.theme import STYLE
+from app.tray import TrayController
 from app.window_manager import IS_WINDOWS, WindowInfo, get_foreground_window
 
 
@@ -52,7 +53,6 @@ def run() -> int:
             )
 
     hotkeys = HotkeyController(app, int(win.winId()), move_foreground_to_slot, 9)
-    # Simpan referensi agar native event filter tidak di-GC selama aplikasi hidup.
     win.hotkey_controller = hotkeys
 
     def snap_dragged_window(active: WindowInfo, slot: int, monitor_index: int) -> None:
@@ -72,15 +72,20 @@ def run() -> int:
     win.zone_controller = zones
     app.aboutToQuit.connect(zones.close)
 
+    tray = TrayController(app, win, hotkeys, zones)
+    win.tray_controller = tray
+    app.aboutToQuit.connect(tray.close)
+
     if IS_WINDOWS:
-        if hotkeys.registered_count == 9:
-            win.status_label.setText(
-                "Multi-monitor aktif • Zona drag • Hotkey Ctrl+Alt+1 sampai Ctrl+Alt+9"
-            )
+        zone_text = "Zona aktif" if tray.zone_action.isChecked() else "Zona nonaktif"
+        if tray.hotkey_action.isChecked():
+            hotkey_text = f"Hotkey {hotkeys.registered_count}/9"
         else:
-            win.status_label.setText(
-                f"Multi-monitor aktif • Zona drag • Hotkey {hotkeys.registered_count}/9 tersedia"
-            )
+            hotkey_text = "Hotkey nonaktif"
+        tray_text = "Tray aktif" if tray.available else "Tray tidak tersedia"
+        win.status_label.setText(
+            f"Multi-monitor • {zone_text} • {hotkey_text} • {tray_text}"
+        )
 
     return app.exec()
 
