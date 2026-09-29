@@ -1,1 +1,0 @@
-Asset visual aplikasi Bagi Layar. File wallpaper_preview.png dipakai hanya untuk preview monitor di UI agar lebih dekat dengan gambar acuan.
