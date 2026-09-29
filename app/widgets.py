@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QRectF, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from .layouts import grid_shape
 
 
 class MonitorPreview(QWidget):
+    """Preview monitor interaktif yang meniru mockup aplikasi."""
+
     slot_clicked = Signal(int)
 
     def __init__(self, parent=None):
@@ -22,7 +24,13 @@ class MonitorPreview(QWidget):
         self.setMouseTracking(True)
         self.setCursor(Qt.PointingHandCursor)
 
-    def set_layout_count(self, count: int, custom_shape: tuple[int, int] | None = None, margin: int | None = None, gap: int | None = None):
+    def set_layout_count(
+        self,
+        count: int,
+        custom_shape: tuple[int, int] | None = None,
+        margin: int | None = None,
+        gap: int | None = None,
+    ):
         self.count = max(1, count)
         self.custom_shape = custom_shape
         if margin is not None:
@@ -40,59 +48,132 @@ class MonitorPreview(QWidget):
         self.assignments = dict(assignments)
         self.update()
 
+    def _screen_rect(self) -> QRectF:
+        # Sisakan ruang di bawah untuk stand seperti gambar acuan.
+        bounds = self.rect().adjusted(20, 14, -20, -38)
+        return QRectF(bounds)
+
     def _cells(self) -> list[QRectF]:
-        bounds = self.rect().adjusted(20, 16, -20, -34)
-        screen = QRectF(bounds)
+        screen = self._screen_rect()
         inner = screen.adjusted(12, 12, -12, -12)
         rows, cols = self.custom_shape or grid_shape(self.count)
-        preview_margin = min(20.0, self.margin * 0.42)
-        preview_gap = min(14.0, max(3.0, self.gap * 0.42))
+        preview_margin = min(18.0, self.margin * 0.40)
+        preview_gap = min(13.0, max(3.0, self.gap * 0.42))
         inner = inner.adjusted(preview_margin, preview_margin, -preview_margin, -preview_margin)
         cell_w = max(1.0, (inner.width() - preview_gap * (cols - 1)) / cols)
         cell_h = max(1.0, (inner.height() - preview_gap * (rows - 1)) / rows)
         cells: list[QRectF] = []
-        for i in range(min(self.count, rows * cols)):
-            r, c = divmod(i, cols)
-            cells.append(QRectF(inner.x() + c * (cell_w + preview_gap), inner.y() + r * (cell_h + preview_gap), cell_w, cell_h))
+        for index in range(min(self.count, rows * cols)):
+            row, col = divmod(index, cols)
+            cells.append(
+                QRectF(
+                    inner.x() + col * (cell_w + preview_gap),
+                    inner.y() + row * (cell_h + preview_gap),
+                    cell_w,
+                    cell_h,
+                )
+            )
         return cells
+
+    @staticmethod
+    def _wallpaper(painter: QPainter, cell: QRectF, hovered: bool):
+        path = QPainterPath()
+        path.addRoundedRect(cell, 5, 5)
+        painter.save()
+        painter.setClipPath(path)
+
+        gradient = QLinearGradient(cell.topLeft(), cell.bottomRight())
+        gradient.setColorAt(0.0, QColor("#87bde9" if hovered else "#91c1e5"))
+        gradient.setColorAt(0.46, QColor("#377fd0"))
+        gradient.setColorAt(1.0, QColor("#0759cf"))
+        painter.fillRect(cell, gradient)
+
+        # Gelombang abstrak ala Windows 11, dibuat native agar tidak butuh aset gambar.
+        waves = [
+            (QColor(103, 181, 255, 190), 0.10, 0.48, 0.98, 1.02),
+            (QColor(25, 112, 238, 190), 0.02, 0.62, 0.84, 0.92),
+            (QColor(12, 70, 190, 170), 0.24, 0.36, 0.98, 0.82),
+            (QColor(132, 205, 255, 125), 0.42, 0.10, 1.08, 0.70),
+        ]
+        painter.setPen(Qt.NoPen)
+        for color, left, top, right, bottom in waves:
+            painter.setBrush(color)
+            r = QRectF(
+                cell.x() + cell.width() * left,
+                cell.y() + cell.height() * top,
+                cell.width() * (right - left),
+                cell.height() * (bottom - top),
+            )
+            painter.drawEllipse(r)
+
+        # Highlight lembut.
+        shine = QLinearGradient(QPointF(cell.left(), cell.top()), QPointF(cell.right(), cell.bottom()))
+        shine.setColorAt(0.0, QColor(255, 255, 255, 65))
+        shine.setColorAt(0.55, QColor(255, 255, 255, 0))
+        shine.setColorAt(1.0, QColor(0, 30, 90, 40))
+        painter.fillRect(cell, shine)
+        painter.restore()
 
     def paintEvent(self, _event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        bounds = self.rect().adjusted(20, 16, -20, -34)
-        screen = QRectF(bounds)
-        painter.setPen(QPen(QColor("#272b31"), 7))
-        painter.setBrush(QColor("#0b0d11"))
-        painter.drawRoundedRect(screen, 12, 12)
+        screen = self._screen_rect()
 
-        for i, cell in enumerate(self._cells()):
-            hovered = i == self.hover_slot
-            painter.setPen(QPen(QColor("#87bbff" if hovered else "#55a5ff"), 2.0 if hovered else 1.5))
-            painter.setBrush(QColor("#cfe4ff" if hovered else "#dcecff"))
-            painter.drawRoundedRect(cell, 5, 5)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor(37, 105, 230, 90))
-            painter.drawEllipse(cell.adjusted(cell.width()*0.10, cell.height()*0.18, -cell.width()*0.08, -cell.height()*0.08))
-            painter.setBrush(QColor(20, 70, 165, 80))
-            painter.drawEllipse(cell.adjusted(cell.width()*0.30, cell.height()*0.08, -cell.width()*0.02, -cell.height()*0.24))
-            badge = max(30.0, min(cell.width(), cell.height()) * 0.27)
-            cx, cy = cell.center().x(), cell.center().y()
-            painter.setBrush(QColor(18, 42, 76, 225))
-            painter.drawEllipse(QRectF(cx - badge/2, cy - badge/2, badge, badge))
-            painter.setPen(QColor("white"))
-            font = QFont(self.font()); font.setBold(True); font.setPointSizeF(max(10, badge * 0.24)); painter.setFont(font)
-            painter.drawText(QRectF(cx - badge/2, cy - badge/2, badge, badge), Qt.AlignCenter, str(i + 1))
-            label = self.assignments.get(i)
-            if label:
-                painter.setPen(QColor("#10345f"))
-                small = QFont(self.font()); small.setPointSizeF(8.5); painter.setFont(small)
-                painter.drawText(cell.adjusted(8, cell.height() - 28, -8, -5), Qt.AlignCenter | Qt.TextSingleLine, label[:30])
-
+        # Bayangan tipis dan frame monitor.
+        shadow = screen.translated(0, 4).adjusted(-3, -3, 3, 3)
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor("#4f535a"))
-        center_x = screen.center().x(); bottom = screen.bottom()
-        painter.drawRoundedRect(QRectF(center_x - 26, bottom + 5, 52, 18), 3, 3)
-        painter.drawRoundedRect(QRectF(center_x - 72, bottom + 22, 144, 8), 4, 4)
+        painter.setBrush(QColor(10, 24, 40, 38))
+        painter.drawRoundedRect(shadow, 13, 13)
+        painter.setPen(QPen(QColor("#2b2f35"), 7))
+        painter.setBrush(QColor("#0b0d11"))
+        painter.drawRoundedRect(screen, 11, 11)
+
+        for index, cell in enumerate(self._cells()):
+            hovered = index == self.hover_slot
+            self._wallpaper(painter, cell, hovered)
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(QPen(QColor("#78b8ff" if hovered else "#4ea2ff"), 2.2 if hovered else 1.4))
+            painter.drawRoundedRect(cell, 5, 5)
+
+            # Nomor slot.
+            badge = max(32.0, min(cell.width(), cell.height()) * 0.26)
+            cx, cy = cell.center().x(), cell.center().y()
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(14, 39, 70, 226))
+            painter.drawEllipse(QRectF(cx - badge / 2, cy - badge / 2, badge, badge))
+            painter.setPen(QColor("#ffffff"))
+            font = QFont(self.font())
+            font.setBold(True)
+            font.setPointSizeF(max(11, badge * 0.25))
+            painter.setFont(font)
+            painter.drawText(
+                QRectF(cx - badge / 2, cy - badge / 2, badge, badge),
+                Qt.AlignCenter,
+                str(index + 1),
+            )
+
+            # Nama jendela di bagian bawah slot jika sudah dipetakan.
+            label = self.assignments.get(index)
+            if label:
+                pill = cell.adjusted(8, cell.height() - 29, -8, -6)
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QColor(7, 34, 75, 155))
+                painter.drawRoundedRect(pill, 6, 6)
+                painter.setPen(QColor("#ffffff"))
+                small = QFont(self.font())
+                small.setPointSizeF(8.2)
+                painter.setFont(small)
+                painter.drawText(pill.adjusted(7, 0, -7, 0), Qt.AlignCenter | Qt.TextSingleLine, label[:27])
+
+        # Leher dan kaki monitor.
+        painter.setPen(Qt.NoPen)
+        base_gradient = QLinearGradient(QPointF(screen.center().x(), screen.bottom()), QPointF(screen.center().x(), screen.bottom() + 30))
+        base_gradient.setColorAt(0, QColor("#767b82"))
+        base_gradient.setColorAt(1, QColor("#3e4248"))
+        painter.setBrush(base_gradient)
+        center_x, bottom = screen.center().x(), screen.bottom()
+        painter.drawRoundedRect(QRectF(center_x - 25, bottom + 5, 50, 18), 3, 3)
+        painter.drawRoundedRect(QRectF(center_x - 72, bottom + 21, 144, 8), 4, 4)
 
     def _slot_at(self, pos) -> int:
         for index, cell in enumerate(self._cells()):
@@ -126,16 +207,61 @@ class LayoutButton(QPushButton):
     def __init__(self, count: int, label: str, parent=None):
         super().__init__(parent)
         self.count = count
+        self.label = label
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
         self.setMinimumHeight(82)
-        self.setText(self._make_text(label))
+        self.setMinimumWidth(88)
+        self.setText("")
         self.clicked.connect(lambda: self.selected.emit(self.count))
 
-    def _make_text(self, label: str) -> str:
-        rows, _cols = grid_shape(self.count if self.count > 0 else 6)
-        icon = "□" if self.count <= 0 else ("▦" if rows > 1 else "▥")
-        return f"{icon}\n{label}"
+    def paintEvent(self, _event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        rect = QRectF(self.rect()).adjusted(1, 1, -1, -1)
+        selected = self.isChecked()
+        hovered = self.underMouse()
+
+        if selected:
+            bg, border = QColor("#eaf3ff"), QColor("#2681ff")
+            pen_width = 2.0
+        elif hovered:
+            bg, border = QColor("#f9fbff"), QColor("#9bc1f4")
+            pen_width = 1.0
+        else:
+            bg, border = QColor("#ffffff"), QColor("#dce4ed")
+            pen_width = 1.0
+
+        painter.setBrush(bg)
+        painter.setPen(QPen(border, pen_width))
+        painter.drawRoundedRect(rect, 9, 9)
+
+        icon_area = QRectF(rect.x() + 20, rect.y() + 13, rect.width() - 40, 31)
+        icon_color = QColor("#5ba0f8" if selected else "#9aa8ba")
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(icon_color)
+
+        if self.count <= 0:
+            painter.setBrush(Qt.NoBrush)
+            pen = QPen(icon_color, 1.5, Qt.DashLine)
+            painter.setPen(pen)
+            painter.drawRoundedRect(icon_area.adjusted(6, 0, -6, 0), 3, 3)
+        else:
+            rows, cols = grid_shape(self.count)
+            gap = 3.0
+            w = (icon_area.width() - gap * (cols - 1)) / cols
+            h = (icon_area.height() - gap * (rows - 1)) / rows
+            for idx in range(min(self.count, rows * cols)):
+                row, col = divmod(idx, cols)
+                cell = QRectF(icon_area.x() + col * (w + gap), icon_area.y() + row * (h + gap), w, h)
+                painter.drawRoundedRect(cell, 1.6, 1.6)
+
+        painter.setPen(QColor("#075fd5" if selected else "#252e3b"))
+        font = QFont(self.font())
+        font.setPointSizeF(9.2)
+        font.setBold(selected)
+        painter.setFont(font)
+        painter.drawText(QRectF(rect.x() + 3, rect.bottom() - 29, rect.width() - 6, 22), Qt.AlignCenter, self.label)
 
 
 class ActionCard(QFrame):
@@ -145,11 +271,27 @@ class ActionCard(QFrame):
         super().__init__(parent)
         self.setObjectName("ActionPrimary" if primary else "ActionCard")
         self.setCursor(Qt.PointingHandCursor)
-        layout = QHBoxLayout(self); layout.setContentsMargins(18, 12, 18, 12)
-        icon_label = QLabel(icon); icon_label.setObjectName("ActionIcon"); icon_label.setFixedWidth(34); layout.addWidget(icon_label)
-        text = QVBoxLayout(); title_label = QLabel(title); title_label.setObjectName("ActionTitle")
-        subtitle_label = QLabel(subtitle); subtitle_label.setObjectName("ActionSubtitle")
-        text.addWidget(title_label); text.addWidget(subtitle_label); layout.addLayout(text); layout.addStretch()
+        self.setMinimumHeight(62)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 10, 16, 10)
+        layout.setSpacing(9)
+
+        icon_label = QLabel(icon)
+        icon_label.setObjectName("ActionIcon")
+        icon_label.setAlignment(Qt.AlignCenter)
+        icon_label.setFixedSize(32, 32)
+        layout.addWidget(icon_label)
+
+        text = QVBoxLayout()
+        text.setSpacing(1)
+        title_label = QLabel(title)
+        title_label.setObjectName("ActionTitle")
+        subtitle_label = QLabel(subtitle)
+        subtitle_label.setObjectName("ActionSubtitle")
+        text.addWidget(title_label)
+        text.addWidget(subtitle_label)
+        layout.addLayout(text)
+        layout.addStretch()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
