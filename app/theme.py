@@ -115,6 +115,26 @@ QListWidget::item:selected {
     padding: 8px 9px;
 }
 
+#MiniAction {
+    background: #ffffff;
+    color: #415064;
+    border: 1px solid #d7e0eb;
+    border-radius: 7px;
+    padding: 5px 7px;
+    min-height: 24px;
+    font-size: 9px;
+    font-weight: 600;
+}
+#MiniAction:hover {
+    color: #075fd5;
+    background: #f7fbff;
+    border-color: #9fc4f4;
+}
+#MiniAction:pressed {
+    background: #e8f2ff;
+    border-color: #5b9cf1;
+}
+
 QPushButton#LayoutPreset {
     background: #ffffff;
     border: 1px solid #dce4ed;
