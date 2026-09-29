@@ -30,16 +30,20 @@ Aplikasi Windows untuk membagi dan menyusun jendela ke beberapa slot pada satu a
 - Lepas assignment slot tanpa menutup jendela.
 - Hotkey global `Ctrl+Alt+1` sampai `Ctrl+Alt+9` untuk memindahkan jendela aktif langsung ke slot pada monitor yang sedang dipilih di Bagi Layar.
 - Hotkey global dapat dimatikan/diaktifkan saat runtime dari system tray.
+- **Target Monitor Hotkey** dapat dipilih langsung dari menu tray tanpa membuka UI utama.
 - Kunci layout bekerja lintas monitor; monitor yang Kunci Layout-nya nonaktif tidak dipaksa kembali.
 - Saat drag manual berlangsung, kunci layout dijeda sementara agar tidak melawan gerakan pengguna.
 - Mode system tray: minimize atau klik X menyembunyikan UI, tetapi engine zona/hotkey tetap aktif.
-- Menu tray menyediakan **Buka Bagi Layar**, toggle **Zona Drag**, toggle **Hotkey Ctrl+Alt+1…9**, **Mulai bersama Windows**, dan **Keluar Bagi Layar**.
+- Menu tray menyediakan **Buka Bagi Layar**, **Workspace Cepat**, **Target Monitor Hotkey**, toggle **Zona Drag**, toggle **Hotkey Ctrl+Alt+1…9**, **Mulai bersama Windows**, dan **Keluar Bagi Layar**.
+- **Workspace Cepat** dapat memulihkan workspace tersimpan langsung dari tray.
 - Opsi **Mulai bersama Windows** memakai startup per-user, tidak membutuhkan administrator atau installer.
 - Saat auto-start, Bagi Layar langsung masuk tray menggunakan argumen `--tray` sehingga jendela utama tidak mengganggu saat login Windows.
+- Single-instance: Bagi Layar mencegah dua engine/tray/hotkey berjalan bersamaan.
+- Jika EXE dibuka lagi saat aplikasi sudah aktif, instance lama dibawa ke depan; auto-start `--tray` kedua keluar diam-diam.
 - Preferensi toggle zona/hotkey diingat menggunakan pengaturan aplikasi.
 - Simpan dan pulihkan banyak workspace.
 - UI Bahasa Indonesia.
-- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor/system-tray/auto-start, tes engine layout, lalu build portable Windows.
+- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor/system-tray/auto-start/single-instance, tes engine layout, lalu build portable Windows.
 
 ## Cara pakai multi-monitor
 
@@ -63,12 +67,20 @@ Pada Windows yang memiliki system tray:
 4. Klik/double-click ikon **Bagi Layar** di tray untuk membuka UI lagi.
 5. Klik kanan ikon tray untuk:
    - membuka Bagi Layar;
+   - memilih dan memulihkan **Workspace Cepat**;
+   - memilih **Target Monitor Hotkey**;
    - mengaktifkan/nonaktifkan **Zona Drag**;
    - mengaktifkan/nonaktifkan **Hotkey Ctrl+Alt+1…9**;
    - mengaktifkan/nonaktifkan **Mulai bersama Windows**;
    - benar-benar keluar melalui **Keluar Bagi Layar**.
 
 Jika system tray tidak tersedia, perilaku close kembali normal dan aplikasi tidak memaksa berjalan di background.
+
+## Single-instance
+
+Bagi Layar hanya menjalankan satu engine per akun pengguna. Hal ini mencegah dua ikon tray, dua overlay, dua Kunci Layout, atau benturan registrasi hotkey.
+
+Jika `Bagi-Layar.exe` dijalankan lagi secara manual saat aplikasi sudah aktif, proses baru mengirim perintah ke instance lama untuk membuka jendela utama lalu langsung keluar. Jika pemanggilan kedua berasal dari auto-start `--tray`, proses kedua cukup keluar tanpa memunculkan UI.
 
 ## Mulai bersama Windows
 
@@ -88,7 +100,9 @@ Saat Windows login, aplikasi dipanggil dengan `--tray`: UI utama tidak langsung 
    - tekan **Susun Jendela** untuk menyusun beberapa jendela terpilih sekaligus;
    - tarik jendela dari daftar kiri langsung ke slot pada preview;
    - double-click jendela untuk memasukkannya ke slot kosong pertama;
-   - tekan `Ctrl+Alt+1` sampai `Ctrl+Alt+9` untuk memindahkan jendela aktif langsung ke slot terkait pada monitor aktif.
+   - tekan `Ctrl+Alt+1` sampai `Ctrl+Alt+9` untuk memindahkan jendela aktif langsung ke slot terkait pada monitor aktif;
+   - saat UI berada di tray, pilih **Target Monitor Hotkey** untuk mengganti monitor tujuan;
+   - pilih **Workspace Cepat** untuk memulihkan susunan tanpa membuka UI utama.
 6. Tekan **Simpan Workspace** jika seluruh susunan multi-monitor ingin digunakan lagi.
 
 Hotkey yang slotnya tidak tersedia pada layout monitor aktif akan diabaikan dan statusnya ditampilkan di bagian bawah aplikasi.
@@ -111,4 +125,4 @@ Hasil build berada di `dist\Bagi-Layar\`. Folder tersebut dapat dipindah dan dij
 
 ## Catatan
 
-UI dapat dibuka di OS lain untuk pengembangan, tetapi fungsi memindahkan/resize jendela, overlay zona otomatis, hotkey global, system tray, dan auto-start ditujukan untuk Windows.
+UI dapat dibuka di OS lain untuk pengembangan, tetapi fungsi memindahkan/resize jendela, overlay zona otomatis, hotkey global, system tray, auto-start, dan integrasi Windows ditujukan untuk Windows.
