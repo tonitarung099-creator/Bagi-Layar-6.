@@ -32,6 +32,10 @@ class TrayController(QObject):
         self.workspace_menu = self.menu.addMenu("Workspace Cepat")
         self.workspace_menu.aboutToShow.connect(self._rebuild_workspace_menu)
         self._rebuild_workspace_menu()
+
+        self.monitor_menu = self.menu.addMenu("Target Monitor Hotkey")
+        self.monitor_menu.aboutToShow.connect(self._rebuild_monitor_menu)
+        self._rebuild_monitor_menu()
         self.menu.addSeparator()
 
         self.zone_action = QAction("Zona Drag", self.menu)
@@ -139,6 +143,7 @@ class TrayController(QObject):
 
         self.window.restore_workspace()
         self._rebuild_workspace_menu()
+        self._rebuild_monitor_menu()
         if hasattr(self.window, "status_label"):
             self.window.status_label.setText(f'Workspace "{name}" dipulihkan dari tray')
         if self.available:
@@ -147,6 +152,47 @@ class TrayController(QObject):
                 name,
                 QSystemTrayIcon.MessageIcon.Information,
                 1800,
+            )
+
+    def _rebuild_monitor_menu(self) -> None:
+        self.monitor_menu.clear()
+        screens = QApplication.screens()
+        if not screens:
+            action = self.monitor_menu.addAction("Monitor tidak terdeteksi")
+            action.setEnabled(False)
+            return
+
+        selected = int(getattr(self.window, "selected_monitor", 0))
+        for index, screen in enumerate(screens):
+            geo = screen.geometry()
+            slot_count = "?"
+            if hasattr(self.window, "_profile_for_monitor"):
+                try:
+                    slot_count = str(self.window._profile_for_monitor(index).get("layout_count", "?"))
+                except Exception:
+                    pass
+            action = QAction(
+                f"Monitor {index + 1} • {slot_count} slot • {geo.width()}×{geo.height()}",
+                self.monitor_menu,
+            )
+            action.setCheckable(True)
+            action.setChecked(index == selected)
+            action.triggered.connect(
+                lambda _checked=False, monitor_index=index: self._select_hotkey_monitor(monitor_index)
+            )
+            self.monitor_menu.addAction(action)
+
+    def _select_hotkey_monitor(self, index: int) -> None:
+        screens = QApplication.screens()
+        if not screens:
+            return
+        index = max(0, min(int(index), len(screens) - 1))
+        if hasattr(self.window, "_select_monitor"):
+            self.window._select_monitor(index)
+        self._rebuild_monitor_menu()
+        if hasattr(self.window, "status_label"):
+            self.window.status_label.setText(
+                f"Target hotkey diubah ke Monitor {index + 1}"
             )
 
     def _set_zones_enabled(self, enabled: bool) -> None:
