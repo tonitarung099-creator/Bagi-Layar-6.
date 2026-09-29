@@ -17,6 +17,7 @@ class TrayController(QObject):
         self.window = window
         self.hotkeys = hotkeys
         self.zones = zones
+        self.auto_restore_controller = None
         self.settings = QSettings(
             str(config_file("settings.ini")),
             QSettings.Format.IniFormat,
@@ -54,6 +55,16 @@ class TrayController(QObject):
         self.hotkey_action.setChecked(self.settings.value("hotkeys_enabled", True, bool))
         self.hotkey_action.toggled.connect(self._set_hotkeys_enabled)
         self.menu.addAction(self.hotkey_action)
+
+        self.auto_restore_action = QAction(
+            "Pulihkan workspace otomatis saat mulai", self.menu
+        )
+        self.auto_restore_action.setCheckable(True)
+        self.auto_restore_action.setChecked(
+            self.settings.value("auto_restore_workspace", False, bool)
+        )
+        self.auto_restore_action.toggled.connect(self._set_auto_restore_enabled)
+        self.menu.addAction(self.auto_restore_action)
 
         self.startup_action = QAction("Mulai bersama Windows", self.menu)
         self.startup_action.setCheckable(True)
@@ -96,6 +107,16 @@ class TrayController(QObject):
         painter.drawLine(15, 31, 49, 31)
         painter.end()
         return QIcon(pixmap)
+
+    def bind_auto_restore(self, controller) -> None:
+        self.auto_restore_controller = controller
+        try:
+            enabled = bool(controller.is_enabled())
+            self.auto_restore_action.blockSignals(True)
+            self.auto_restore_action.setChecked(enabled)
+            self.auto_restore_action.blockSignals(False)
+        except Exception:
+            pass
 
     def _rebuild_workspace_menu(self) -> None:
         self.workspace_menu.clear()
@@ -228,6 +249,44 @@ class TrayController(QObject):
             else:
                 self.window.status_label.setText("Hotkey global nonaktif")
 
+    def _set_auto_restore_enabled(self, enabled: bool) -> None:
+        enabled = bool(enabled)
+        self.settings.setValue("auto_restore_workspace", enabled)
+        self.settings.sync()
+        controller = self.auto_restore_controller
+        if controller is not None:
+            controller.set_enabled(enabled)
+            if enabled:
+                controller.start(800)
+            else:
+                controller.stop()
+        if hasattr(self.window, "status_label"):
+            self.window.status_label.setText(
+                "Auto-restore workspace aktif"
+                if enabled
+                else "Auto-restore workspace nonaktif"
+            )
+
+    def notify_auto_restore_finished(self, success: bool, current: int, expected: int) -> None:
+        if success:
+            title = "Workspace otomatis dipulihkan"
+            message = f"{current}/{expected} jendela sudah kembali ke slot tersimpan."
+        else:
+            title = "Auto-restore selesai sebagian"
+            message = (
+                f"{current}/{expected} jendela ditemukan. "
+                "Jendela yang belum terbuka dapat dipulihkan lagi dari Workspace Cepat."
+            )
+        if hasattr(self.window, "status_label"):
+            self.window.status_label.setText(f"{title} • {message}")
+        if self.available:
+            self.tray.showMessage(
+                title,
+                message,
+                QSystemTrayIcon.MessageIcon.Information,
+                2800,
+            )
+
     def _set_startup_enabled(self, enabled: bool) -> None:
         enabled = bool(enabled)
         if not STARTUP_WINDOWS:
@@ -301,5 +360,10 @@ class TrayController(QObject):
             self.window.removeEventFilter(self)
         except Exception:
             pass
+        if self.auto_restore_controller is not None:
+            try:
+                self.auto_restore_controller.stop()
+            except Exception:
+                pass
         self.settings.sync()
         self.tray.hide()
