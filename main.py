@@ -1,10 +1,10 @@
 import sys
 
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 from app.sol_app_window import AppMainWindow, MultiMonitorDragZoneController
 from app.auto_restore import StartupWorkspaceRestorer
+from app.fonts import preferred_ui_font
 from app.hotkeys import HotkeyController
 from app.single_instance import SingleInstanceManager
 from app.sol_theme import STYLE
@@ -20,8 +20,8 @@ def run() -> int:
     app.setApplicationName("Bagi Layar")
     app.setOrganizationName("ToniTools")
     app.setStyle("Fusion")
+    app.setFont(preferred_ui_font(10))
     app.setStyleSheet(STYLE)
-    app.setFont(QFont("Segoe UI", 10))
 
     single_instance = SingleInstanceManager(app)
     if not single_instance.acquire_or_notify(show_existing=not start_hidden):

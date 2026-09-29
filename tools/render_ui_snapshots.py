@@ -8,13 +8,13 @@ import sys
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QListWidgetItem, QPushButton, QStyle
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.fonts import preferred_ui_font
 from app.sol_app_window import AppMainWindow
 from app.sol_theme import STYLE
 
@@ -61,8 +61,8 @@ def visual_fixture(win: AppMainWindow) -> None:
 def main() -> int:
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
+    app.setFont(preferred_ui_font(10))
     app.setStyleSheet(STYLE)
-    app.setFont(QFont("Segoe UI", 10))
     out = ROOT / "artifacts" / "ui"
     out.mkdir(parents=True, exist_ok=True)
 
@@ -84,6 +84,7 @@ def main() -> int:
                 "size": [width, height],
                 "actual": [win.width(), win.height()],
                 "minimum": [win.minimumWidth(), win.minimumHeight()],
+                "font": app.font().family(),
                 "file": path.name,
             }
         )

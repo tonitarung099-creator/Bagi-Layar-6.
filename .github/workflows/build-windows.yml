@@ -50,6 +50,7 @@ jobs:
           Set-Location $env:APP_SOURCE
           python -m compileall -q app tools main.py
           python -c "from app.sol_app_window import AppMainWindow, MultiMonitorDragZoneController; from app.reference_widgets import ToggleSwitch, ReferenceMonitorPreview; print('Sol production UI imports OK')"
+          python -c "from PySide6.QtWidgets import QApplication; from app.fonts import preferred_ui_font; app=QApplication([]); font=preferred_ui_font(10); assert font.family(); print('UI font terpilih:', font.family())"
           python -c "from PySide6.QtWidgets import QApplication; from app.sol_app_window import AppMainWindow; app=QApplication([]); win=AppMainWindow(); win.lock_timer.stop(); assert len(win._targets()) >= 1; assert win.minimumWidth() <= 1080; assert callable(win.restore_missing_workspace_windows); assert win.nav_group.exclusive(); win.close(); print('Hardened production window OK')"
           python -c "from PySide6.QtWidgets import QApplication; from app.zone_overlay import ZoneOverlay; app=QApplication([]); overlay=ZoneOverlay(); overlay.close(); print('Zone overlay OK')"
           python -c "from app.multi_monitor import MultiMonitorMainWindow; p=MultiMonitorMainWindow._normalize_profile({'layout_count':4,'margin':9,'gap':7}); assert p['layout_count']==4 and p['margin']==9 and p['gap']==7; print('Multi-monitor profile OK')"
@@ -88,7 +89,7 @@ jobs:
           name: Bagi-Layar-UI-Snapshots
           path: ${{ env.APP_SOURCE }}/artifacts/ui/
 
-      - name: Build portable folder
+      - name: Build dan smoke-test portable folder
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: |
@@ -101,6 +102,26 @@ jobs:
             "Folder konfigurasi portable Bagi Layar.",
             "workspace.json dan settings.ini akan dibuat otomatis di folder ini."
           ) | Set-Content -Path "dist\Bagi-Layar\config\README.txt" -Encoding UTF8
+
+          # Smoke test EXE hasil build dari lokasi yang sudah dipindah dan memakai
+          # path berspasi/non-ASCII. Ini menguji start-up paket portable, bukan
+          # sekadar source Python.
+          $smokeDir = Join-Path $env:RUNNER_TEMP 'Bagi Layar Uji_日本'
+          if (Test-Path $smokeDir) { Remove-Item $smokeDir -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+          Copy-Item -Path "dist\Bagi-Layar\*" -Destination $smokeDir -Recurse -Force
+          $exe = Join-Path $smokeDir 'Bagi-Layar.exe'
+          if (-not (Test-Path $exe)) { throw "EXE portable tidak ditemukan di lokasi smoke test" }
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $process = Start-Process -FilePath $exe -ArgumentList '--tray' -PassThru
+          Start-Sleep -Seconds 5
+          if ($process.HasExited) {
+            throw "EXE portable keluar saat smoke test dengan kode $($process.ExitCode)"
+          }
+          Stop-Process -Id $process.Id -Force
+          $process.WaitForExit()
+          Write-Host "Portable EXE smoke test OK dari: $smokeDir"
+
           $zip = "dist\Bagi-Layar-Windows-Portable.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path "dist\Bagi-Layar\*" -DestinationPath $zip -CompressionLevel Optimal
