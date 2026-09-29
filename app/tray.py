@@ -28,6 +28,10 @@ class TrayController(QObject):
         self.open_action = QAction("Buka Bagi Layar", self.menu)
         self.open_action.triggered.connect(self.show_window)
         self.menu.addAction(self.open_action)
+
+        self.workspace_menu = self.menu.addMenu("Workspace Cepat")
+        self.workspace_menu.aboutToShow.connect(self._rebuild_workspace_menu)
+        self._rebuild_workspace_menu()
         self.menu.addSeparator()
 
         self.zone_action = QAction("Zona Drag", self.menu)
@@ -83,6 +87,67 @@ class TrayController(QObject):
         painter.drawLine(15, 31, 49, 31)
         painter.end()
         return QIcon(pixmap)
+
+    def _rebuild_workspace_menu(self) -> None:
+        self.workspace_menu.clear()
+        storage = getattr(self.window, "storage", None)
+        if storage is None:
+            action = self.workspace_menu.addAction("Workspace tidak tersedia")
+            action.setEnabled(False)
+            return
+
+        names = storage.list_workspaces()
+        active = str(getattr(self.window, "active_workspace", ""))
+        if not names:
+            action = self.workspace_menu.addAction("Belum ada workspace")
+            action.setEnabled(False)
+            return
+
+        for name in names:
+            data = storage.get_workspace(name)
+            label = name if data else f"{name} (kosong)"
+            action = QAction(label, self.workspace_menu)
+            action.setCheckable(True)
+            action.setChecked(name == active)
+            action.setEnabled(bool(data))
+            action.triggered.connect(
+                lambda _checked=False, workspace_name=name: self._activate_workspace(workspace_name)
+            )
+            self.workspace_menu.addAction(action)
+
+    def _activate_workspace(self, name: str) -> None:
+        storage = getattr(self.window, "storage", None)
+        if storage is None or not storage.get_workspace(name):
+            return
+
+        if name != getattr(self.window, "active_workspace", ""):
+            workspace_list = getattr(self.window, "workspace_list", None)
+            switched = False
+            if workspace_list is not None:
+                for index in range(workspace_list.count()):
+                    item = workspace_list.item(index)
+                    if str(item.data(Qt.ItemDataRole.UserRole) or "") == name:
+                        self.window._workspace_clicked(item)
+                        switched = True
+                        break
+            if not switched:
+                self.window.active_workspace = name
+                storage.set_active_workspace(name)
+                self.window.saved = storage.get_workspace(name)
+                if hasattr(self.window, "_restore_settings"):
+                    self.window._restore_settings()
+
+        self.window.restore_workspace()
+        self._rebuild_workspace_menu()
+        if hasattr(self.window, "status_label"):
+            self.window.status_label.setText(f'Workspace "{name}" dipulihkan dari tray')
+        if self.available:
+            self.tray.showMessage(
+                "Workspace dipulihkan",
+                name,
+                QSystemTrayIcon.MessageIcon.Information,
+                1800,
+            )
 
     def _set_zones_enabled(self, enabled: bool) -> None:
         enabled = bool(enabled)
