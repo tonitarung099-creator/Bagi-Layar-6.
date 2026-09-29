@@ -4,6 +4,8 @@ from PySide6.QtCore import QEvent, QObject, QSettings, QTimer, Qt
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from .startup import IS_WINDOWS as STARTUP_WINDOWS, is_startup_enabled, set_startup_enabled
+
 
 class TrayController(QObject):
     """Menjaga Bagi Layar aktif di background melalui Windows system tray."""
@@ -39,6 +41,13 @@ class TrayController(QObject):
         self.hotkey_action.setChecked(self.settings.value("hotkeys_enabled", True, bool))
         self.hotkey_action.toggled.connect(self._set_hotkeys_enabled)
         self.menu.addAction(self.hotkey_action)
+
+        self.startup_action = QAction("Mulai bersama Windows", self.menu)
+        self.startup_action.setCheckable(True)
+        self.startup_action.setEnabled(STARTUP_WINDOWS)
+        self.startup_action.setChecked(is_startup_enabled() if STARTUP_WINDOWS else False)
+        self.startup_action.toggled.connect(self._set_startup_enabled)
+        self.menu.addAction(self.startup_action)
 
         self.menu.addSeparator()
         self.quit_action = QAction("Keluar Bagi Layar", self.menu)
@@ -96,6 +105,24 @@ class TrayController(QObject):
                 self.window.status_label.setText(f"Hotkey global aktif {count}/9")
             else:
                 self.window.status_label.setText("Hotkey global nonaktif")
+
+    def _set_startup_enabled(self, enabled: bool) -> None:
+        enabled = bool(enabled)
+        if not STARTUP_WINDOWS:
+            return
+        if set_startup_enabled(enabled):
+            if hasattr(self.window, "status_label"):
+                self.window.status_label.setText(
+                    "Mulai bersama Windows aktif" if enabled else "Mulai bersama Windows nonaktif"
+                )
+            return
+
+        # Kembalikan check state jika registry per-user gagal diubah.
+        self.startup_action.blockSignals(True)
+        self.startup_action.setChecked(not enabled)
+        self.startup_action.blockSignals(False)
+        if hasattr(self.window, "status_label"):
+            self.window.status_label.setText("Gagal mengubah pengaturan mulai bersama Windows")
 
     def show_window(self) -> None:
         self.window.showNormal()
