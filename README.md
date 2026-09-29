@@ -29,11 +29,15 @@ Aplikasi Windows untuk membagi dan menyusun jendela ke beberapa slot pada satu a
 - Klik slot terisi untuk memilih jendela yang menempatinya.
 - Lepas assignment slot tanpa menutup jendela.
 - Hotkey global `Ctrl+Alt+1` sampai `Ctrl+Alt+9` untuk memindahkan jendela aktif langsung ke slot pada monitor yang sedang dipilih di Bagi Layar.
+- Hotkey global dapat dimatikan/diaktifkan saat runtime dari system tray.
 - Kunci layout bekerja lintas monitor; monitor yang Kunci Layout-nya nonaktif tidak dipaksa kembali.
 - Saat drag manual berlangsung, kunci layout dijeda sementara agar tidak melawan gerakan pengguna.
+- Mode system tray: minimize atau klik X menyembunyikan UI, tetapi engine zona/hotkey tetap aktif.
+- Menu tray menyediakan **Buka Bagi Layar**, toggle **Zona Drag**, toggle **Hotkey Ctrl+Alt+1…9**, dan **Keluar Bagi Layar**.
+- Preferensi toggle zona/hotkey diingat menggunakan pengaturan aplikasi.
 - Simpan dan pulihkan banyak workspace.
 - UI Bahasa Indonesia.
-- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor, tes engine layout, lalu build portable Windows.
+- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor/system-tray, tes engine layout, lalu build portable Windows.
 
 ## Cara pakai multi-monitor
 
@@ -46,6 +50,22 @@ Contoh konfigurasi:
 Saat berpindah tab monitor, pengaturan monitor sebelumnya tetap tersimpan di memori workspace. Tekan **Simpan Workspace** untuk menyimpan seluruh konfigurasi monitor dan assignment jendela secara permanen.
 
 Saat **Pulihkan Workspace** ditekan, Bagi Layar mencoba mengembalikan jendela ke monitor dan slot masing-masing. Workspace format lama tetap dibaca dan dimigrasikan sebagai konfigurasi monitor aktif.
+
+## Mode system tray
+
+Pada Windows yang memiliki system tray:
+
+1. Klik tombol **X** atau minimize jendela utama.
+2. Bagi Layar disembunyikan ke tray, bukan dimatikan.
+3. Zona drag, Kunci Layout, dan hotkey tetap dapat bekerja di background.
+4. Klik/double-click ikon **Bagi Layar** di tray untuk membuka UI lagi.
+5. Klik kanan ikon tray untuk:
+   - membuka Bagi Layar;
+   - mengaktifkan/nonaktifkan **Zona Drag**;
+   - mengaktifkan/nonaktifkan **Hotkey Ctrl+Alt+1…9**;
+   - benar-benar keluar melalui **Keluar Bagi Layar**.
+
+Jika system tray tidak tersedia, perilaku close kembali normal dan aplikasi tidak memaksa berjalan di background.
 
 ## Cara pakai cepat
 
@@ -80,4 +100,4 @@ Hasil build berada di `dist\Bagi-Layar\`. Folder tersebut dapat dipindah dan dij
 
 ## Catatan
 
-UI dapat dibuka di OS lain untuk pengembangan, tetapi fungsi memindahkan/resize jendela, overlay zona otomatis, dan hotkey global memakai Win32 API dan hanya aktif di Windows.
+UI dapat dibuka di OS lain untuk pengembangan, tetapi fungsi memindahkan/resize jendela, overlay zona otomatis, hotkey global, dan system tray ditujukan untuk Windows.
