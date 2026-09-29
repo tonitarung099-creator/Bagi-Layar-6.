@@ -5,7 +5,10 @@ import os
 from pathlib import Path
 import sys
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# Linux/macOS headless tetap memakai offscreen. Di runner Windows biarkan Qt
+# memakai platform native agar font sistem dan rendering benar-benar representatif.
+if os.name != "nt":
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QListWidgetItem, QPushButton, QStyle
@@ -86,6 +89,7 @@ def main() -> int:
                 "actual": [win.width(), win.height()],
                 "minimum": [win.minimumWidth(), win.minimumHeight()],
                 "font": app.font().family(),
+                "platform": app.platformName(),
                 "file": path.name,
             }
         )

@@ -6,7 +6,7 @@ call .venv\Scripts\activate.bat
 python -m pip install --upgrade pip
 pip install -r requirements.txt pyinstaller
 rmdir /s /q dist 2>nul
-pyinstaller --noconfirm --clean --windowed --name "Bagi-Layar" main.py
+pyinstaller --noconfirm --clean --windowed --name "Bagi-Layar" --add-data "app/assets/preview_wallpaper.png;app/assets" main.py
 if exist "dist\Bagi-Layar" (
   if not exist "dist\Bagi-Layar\config" mkdir "dist\Bagi-Layar\config"
   >"dist\Bagi-Layar\config\README.txt" echo Folder konfigurasi portable Bagi Layar.

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import QAbstractButton, QPushButton, QSizePolicy, QWidget
 
 from .widgets import MonitorPreview
@@ -88,7 +90,9 @@ class ActionButton(QPushButton):
 
 
 class ReferenceMonitorPreview(MonitorPreview):
-    """Preview dengan bezel, stand, rasio monitor, dan wallpaper lipatan biru."""
+    """Preview dengan bezel, stand, rasio monitor, dan wallpaper biru seperti acuan."""
+
+    _preview_pixmap: QPixmap | None = None
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -112,20 +116,41 @@ class ReferenceMonitorPreview(MonitorPreview):
         height = bounds.width() / max(0.01, target)
         return QRectF(bounds.x(), bounds.center().y() - height / 2, bounds.width(), height)
 
-    @staticmethod
-    def _wallpaper(painter: QPainter, cell: QRectF, hovered: bool):
+    @classmethod
+    def _preview_image(cls) -> QPixmap:
+        if cls._preview_pixmap is None:
+            path = Path(__file__).resolve().parent / "assets" / "preview_wallpaper.png"
+            cls._preview_pixmap = QPixmap(str(path))
+        return cls._preview_pixmap
+
+    @classmethod
+    def _wallpaper(cls, painter: QPainter, cell: QRectF, hovered: bool):
         path = QPainterPath()
         path.addRoundedRect(cell, 4, 4)
         painter.save()
         painter.setClipPath(path)
 
+        pixmap = cls._preview_image()
+        if not pixmap.isNull():
+            scaled = pixmap.scaled(
+                max(1, int(cell.width())),
+                max(1, int(cell.height())),
+                Qt.IgnoreAspectRatio,
+                Qt.SmoothTransformation,
+            )
+            painter.drawPixmap(cell.toRect(), scaled)
+            if hovered:
+                painter.fillRect(cell, QColor(255, 255, 255, 28))
+            painter.restore()
+            return
+
+        # Fallback vektor jika asset gagal dibaca; produksi tetap usable.
         base = QLinearGradient(cell.topLeft(), cell.bottomRight())
         base.setColorAt(0.0, QColor("#b4dcf7" if hovered else "#9fcdf0"))
         base.setColorAt(0.45, QColor("#4b91da"))
         base.setColorAt(1.0, QColor("#1559b9"))
         painter.fillRect(cell, base)
 
-        # Bentuk lipatan bergaya wallpaper Windows 11, semuanya vektor lokal.
         painter.setPen(Qt.NoPen)
         folds = [
             ("#d4eeff", [(0.02, 0.05), (0.55, 0.18), (0.35, 0.55), (0.00, 0.78)]),
