@@ -19,9 +19,14 @@ IS_WINDOWS = os.name == "nt"
 WM_HOTKEY = 0x0312
 HOTKEY_BASE_ID = 0xB600
 VK_LBUTTON = 0x01
+DWMWA_CLOAKED = 14
 
 if IS_WINDOWS:
     user32 = ctypes.windll.user32
+    try:
+        dwmapi = ctypes.windll.dwmapi
+    except Exception:
+        dwmapi = None
     try:
         user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
     except Exception:
@@ -40,6 +45,23 @@ if IS_WINDOWS:
     MOD_NOREPEAT = 0x4000
 
 
+def _is_cloaked(hwnd) -> bool:
+    """True untuk surface Windows/UWP tersembunyi yang bukan jendela nyata pengguna."""
+    if not IS_WINDOWS or dwmapi is None:
+        return False
+    try:
+        cloaked = wintypes.DWORD(0)
+        result = dwmapi.DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_CLOAKED,
+            ctypes.byref(cloaked),
+            ctypes.sizeof(cloaked),
+        )
+        return result == 0 and bool(cloaked.value)
+    except Exception:
+        return False
+
+
 def _window_info(handle: int, exclude_handle: int | None = None) -> WindowInfo | None:
     if not IS_WINDOWS:
         return None
@@ -50,6 +72,8 @@ def _window_info(handle: int, exclude_handle: int | None = None) -> WindowInfo |
         if not user32.IsWindow(hwnd) or not user32.IsWindowVisible(hwnd):
             return None
         if user32.GetParent(hwnd):
+            return None
+        if _is_cloaked(hwnd):
             return None
         try:
             ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
@@ -153,7 +177,9 @@ def move_window(handle: int, rect: Rect) -> bool:
     try:
         if not user32.IsWindow(hwnd):
             return False
-        if user32.IsIconic(hwnd):
+        # SetWindowPos tidak selalu mengubah ukuran jendela yang masih berstatus
+        # minimized/maximized. Kembalikan ke state normal terlebih dahulu.
+        if user32.IsIconic(hwnd) or user32.IsZoomed(hwnd):
             user32.ShowWindow(hwnd, SW_RESTORE)
         return bool(
             user32.SetWindowPos(
