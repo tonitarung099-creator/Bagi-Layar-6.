@@ -17,6 +17,8 @@ Aplikasi Windows untuk membagi dan menyusun jendela ke beberapa slot pada satu a
 - Margin luar dan jarak antar jendela.
 - Pilihan menghormati area taskbar atau memakai seluruh layar.
 - Deteksi jendela aktif menggunakan Win32 API.
+- Jendela minimized maupun maximized dikembalikan ke state normal sebelum dipindahkan ke slot.
+- Surface Windows/UWP yang cloaked/phantom disaring agar tidak memenuhi daftar jendela.
 - Susun beberapa jendela sekaligus ke monitor aktif.
 - Drag-and-drop jendela dari daftar langsung ke slot monitor.
 - Overlay zona otomatis seperti FancyZones saat jendela benar-benar sedang digeser.
@@ -32,6 +34,7 @@ Aplikasi Windows untuk membagi dan menyusun jendela ke beberapa slot pada satu a
 - Hotkey global dapat dimatikan/diaktifkan saat runtime dari system tray.
 - **Target Monitor Hotkey** dapat dipilih langsung dari menu tray tanpa membuka UI utama.
 - Kunci layout bekerja lintas monitor; monitor yang Kunci Layout-nya nonaktif tidak dipaksa kembali.
+- Monitor yang sedang dicabut/offline diabaikan oleh Kunci Layout sehingga assignment-nya tidak salah dialihkan ke Monitor 1.
 - Saat drag manual berlangsung, kunci layout dijeda sementara agar tidak melawan gerakan pengguna.
 - Mode system tray: minimize atau klik X menyembunyikan UI, tetapi engine zona/hotkey tetap aktif.
 - Menu tray menyediakan **Buka Bagi Layar**, **Workspace Cepat**, **Target Monitor Hotkey**, toggle **Zona Drag**, toggle **Hotkey Ctrl+Alt+1…9**, **Mulai bersama Windows**, dan **Keluar Bagi Layar**.
@@ -40,10 +43,12 @@ Aplikasi Windows untuk membagi dan menyusun jendela ke beberapa slot pada satu a
 - Saat auto-start, Bagi Layar langsung masuk tray menggunakan argumen `--tray` sehingga jendela utama tidak mengganggu saat login Windows.
 - Single-instance: Bagi Layar mencegah dua engine/tray/hotkey berjalan bersamaan.
 - Jika EXE dibuka lagi saat aplikasi sudah aktif, instance lama dibawa ke depan; auto-start `--tray` kedua keluar diam-diam.
-- Preferensi toggle zona/hotkey diingat menggunakan pengaturan aplikasi.
+- Workspace dan preferensi tray disimpan secara portable di folder `config/` di sebelah EXE.
+- Preferensi toggle zona/hotkey diingat dalam `config/settings.ini`.
+- Workspace disimpan dalam `config/workspace.json`.
 - Simpan dan pulihkan banyak workspace.
 - UI Bahasa Indonesia.
-- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor/system-tray/auto-start/single-instance, tes engine layout, lalu build portable Windows.
+- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor/system-tray/auto-start/single-instance/portable-config, tes engine layout, lalu build portable Windows.
 
 ## Cara pakai multi-monitor
 
@@ -81,6 +86,18 @@ Jika system tray tidak tersedia, perilaku close kembali normal dan aplikasi tida
 Bagi Layar hanya menjalankan satu engine per akun pengguna. Hal ini mencegah dua ikon tray, dua overlay, dua Kunci Layout, atau benturan registrasi hotkey.
 
 Jika `Bagi-Layar.exe` dijalankan lagi secara manual saat aplikasi sudah aktif, proses baru mengirim perintah ke instance lama untuk membuka jendela utama lalu langsung keluar. Jika pemanggilan kedua berasal dari auto-start `--tray`, proses kedua cukup keluar tanpa memunculkan UI.
+
+## Konfigurasi portable
+
+Build portable selalu membawa folder `config/` di sebelah `Bagi-Layar.exe`.
+
+- `config/workspace.json` menyimpan workspace, konfigurasi monitor, dan assignment jendela.
+- `config/settings.ini` menyimpan preferensi seperti Zona Drag dan Hotkey Global.
+- File konfigurasi runtime tidak dimasukkan ke Git; file dibuat otomatis saat aplikasi digunakan.
+- Jika versi lama sudah memiliki `workspace.json` di AppData, Bagi Layar mencoba menyalinnya otomatis ke folder `config/` saat pertama kali memakai versi portable baru.
+- Jika folder aplikasi berada di lokasi yang tidak bisa ditulis, aplikasi otomatis memakai AppData sebagai fallback agar tetap bisa berjalan.
+
+Dengan demikian folder portable dapat dipindahkan ke drive/folder lain bersama konfigurasi dan workspace-nya. Untuk **Mulai bersama Windows**, setelah folder dipindahkan matikan lalu aktifkan lagi opsi tersebut agar path EXE pada startup Windows diperbarui.
 
 ## Mulai bersama Windows
 
@@ -121,7 +138,7 @@ run.bat
 build_portable.bat
 ```
 
-Hasil build berada di `dist\Bagi-Layar\`. Folder tersebut dapat dipindah dan dijalankan tanpa installer.
+Hasil build berada di `dist\Bagi-Layar\`. Folder tersebut dapat dipindah dan dijalankan tanpa installer. Folder `config\` otomatis dibuat di dalam hasil build.
 
 ## Catatan
 
