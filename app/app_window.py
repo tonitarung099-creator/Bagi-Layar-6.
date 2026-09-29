@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from .multi_monitor import MultiMonitorMainWindow
 from .window_manager import move_window
+from .window_matcher import find_best_window
 
 
 class AppMainWindow(MultiMonitorMainWindow):
@@ -36,8 +37,42 @@ class AppMainWindow(MultiMonitorMainWindow):
                 return index
         return -1
 
+    def _workspace_payload(self) -> dict:
+        """Workspace schema 3 menambahkan process_name tanpa memutus schema lama."""
+        payload = super()._workspace_payload()
+        payload["workspace_schema"] = 3
+        by_handle = {w.handle: w for w in self.windows}
+        monitors = payload.get("monitors")
+        if isinstance(monitors, dict):
+            for key, entry in monitors.items():
+                if not isinstance(entry, dict):
+                    continue
+                assignments = self.monitor_assignments.get(str(key), {})
+                slots = entry.get("slots", [])
+                if not isinstance(slots, list):
+                    continue
+                for slot_data in slots:
+                    if not isinstance(slot_data, dict):
+                        continue
+                    try:
+                        slot = int(slot_data.get("slot", -1))
+                    except Exception:
+                        continue
+                    handle = assignments.get(slot)
+                    win = by_handle.get(handle)
+                    if win is not None:
+                        slot_data["process_name"] = str(
+                            getattr(win, "process_name", "") or ""
+                        )
+
+            active_key = str(payload.get("active_monitor_key") or "")
+            active_entry = monitors.get(active_key)
+            if isinstance(active_entry, dict):
+                payload["slots"] = active_entry.get("slots", [])
+        return payload
+
     def restore_workspace(self):
-        """Restore workspace tanpa memindahkan slot monitor offline ke monitor lain."""
+        """Restore aman untuk monitor offline dan title jendela yang berubah."""
         data = self.storage.get_workspace(self.active_workspace)
         if not data:
             QMessageBox.information(
@@ -53,8 +88,6 @@ class AppMainWindow(MultiMonitorMainWindow):
         self.monitor_assignments = {
             self._screen_key(index): {} for index in range(len(QApplication.screens()))
         }
-        by_exact = {(w.title, w.class_name): w for w in self.windows}
-        by_title = {w.title: w for w in self.windows}
         used_handles: set[int] = set()
         moved = 0
         offline_monitors = 0
@@ -99,10 +132,8 @@ class AppMainWindow(MultiMonitorMainWindow):
                 if not (0 <= slot < len(targets)):
                     continue
 
-                title = str(saved_slot.get("title", ""))
-                class_name = str(saved_slot.get("class_name", ""))
-                win = by_exact.get((title, class_name)) or by_title.get(title)
-                if not win or win.handle in used_handles:
+                win = find_best_window(saved_slot, self.windows, used_handles)
+                if win is None:
                     continue
                 if move_window(win.handle, targets[slot]):
                     assignments[slot] = win.handle
