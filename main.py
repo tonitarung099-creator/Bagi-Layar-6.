@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QApplication
 
 from app.hotkeys import HotkeyController
 from app.multi_monitor import MultiMonitorDragZoneController, MultiMonitorMainWindow
+from app.single_instance import SingleInstanceManager
 from app.theme import STYLE
 from app.tray import TrayController
 from app.window_manager import IS_WINDOWS, WindowInfo, get_foreground_window
@@ -19,6 +20,12 @@ def run() -> int:
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
     app.setFont(QFont("Segoe UI", 10))
+
+    # Hanya satu engine boleh aktif. Launch manual kedua meminta instance lama
+    # membuka UI; launch auto-start --tray kedua cukup keluar diam-diam.
+    single_instance = SingleInstanceManager(app)
+    if not single_instance.acquire_or_notify(show_existing=not start_hidden):
+        return 0
 
     win = MultiMonitorMainWindow()
     win.workspace_list.setObjectName("WorkspaceList")
@@ -80,6 +87,13 @@ def run() -> int:
     win.tray_controller = tray
     app.aboutToQuit.connect(tray.close)
 
+    # Instance kedua yang dibuka manual membawa instance lama ke depan.
+    single_instance.show_requested.connect(tray.show_window)
+    if single_instance.consume_pending_show():
+        tray.show_window()
+    win.single_instance_manager = single_instance
+    app.aboutToQuit.connect(single_instance.close)
+
     if start_hidden:
         if tray.available:
             win.hide()
@@ -96,7 +110,7 @@ def run() -> int:
         tray_text = "Tray aktif" if tray.available else "Tray tidak tersedia"
         startup_text = "Auto-start aktif" if tray.startup_action.isChecked() else "Auto-start nonaktif"
         win.status_label.setText(
-            f"Multi-monitor • {zone_text} • {hotkey_text} • {tray_text} • {startup_text}"
+            f"Multi-monitor • {zone_text} • {hotkey_text} • {tray_text} • {startup_text} • Single-instance"
         )
 
     return app.exec()
