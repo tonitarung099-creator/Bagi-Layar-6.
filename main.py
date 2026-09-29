@@ -4,6 +4,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 from app.app_window import AppMainWindow
+from app.auto_restore import StartupWorkspaceRestorer
 from app.hotkeys import HotkeyController
 from app.multi_monitor import MultiMonitorDragZoneController
 from app.single_instance import SingleInstanceManager
@@ -88,6 +89,14 @@ def run() -> int:
     win.tray_controller = tray
     app.aboutToQuit.connect(tray.close)
 
+    # Pulihkan workspace aktif secara bertahap ketika aplikasi/jendela lain
+    # belum sempat terbuka saat login Windows.
+    auto_restore = StartupWorkspaceRestorer(win)
+    tray.bind_auto_restore(auto_restore)
+    auto_restore.completed.connect(tray.notify_auto_restore_finished)
+    win.auto_restore_controller = auto_restore
+    app.aboutToQuit.connect(auto_restore.close)
+
     # Instance kedua yang dibuka manual membawa instance lama ke depan.
     single_instance.show_requested.connect(tray.show_window)
     if single_instance.consume_pending_show():
@@ -102,6 +111,9 @@ def run() -> int:
             # Jangan biarkan aplikasi tidak terlihat jika system tray tidak tersedia.
             win.show()
 
+    # Timer baru mulai setelah seluruh engine/tray siap.
+    auto_restore.start_if_enabled()
+
     if IS_WINDOWS:
         zone_text = "Zona aktif" if tray.zone_action.isChecked() else "Zona nonaktif"
         if tray.hotkey_action.isChecked():
@@ -110,8 +122,14 @@ def run() -> int:
             hotkey_text = "Hotkey nonaktif"
         tray_text = "Tray aktif" if tray.available else "Tray tidak tersedia"
         startup_text = "Auto-start aktif" if tray.startup_action.isChecked() else "Auto-start nonaktif"
+        restore_text = (
+            "Auto-restore aktif"
+            if tray.auto_restore_action.isChecked()
+            else "Auto-restore nonaktif"
+        )
         win.status_label.setText(
-            f"Multi-monitor • {zone_text} • {hotkey_text} • {tray_text} • {startup_text} • Single-instance"
+            f"Multi-monitor • {zone_text} • {hotkey_text} • {tray_text} • "
+            f"{startup_text} • {restore_text} • Single-instance"
         )
 
     return app.exec()
