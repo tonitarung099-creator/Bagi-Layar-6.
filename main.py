@@ -4,10 +4,9 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication
 
 from app.hotkeys import HotkeyController
-from app.main_window import MainWindow
+from app.multi_monitor import MultiMonitorDragZoneController, MultiMonitorMainWindow
 from app.theme import STYLE
 from app.window_manager import IS_WINDOWS, WindowInfo, get_foreground_window
-from app.zone_overlay import WindowDragZoneController
 
 
 def run() -> int:
@@ -18,7 +17,7 @@ def run() -> int:
     app.setStyleSheet(STYLE)
     app.setFont(QFont("Segoe UI", 10))
 
-    win = MainWindow()
+    win = MultiMonitorMainWindow()
     win.workspace_list.setObjectName("WorkspaceList")
     win.window_list.setObjectName("WindowList")
     win.lock_button.setObjectName("LockToggle")
@@ -34,7 +33,8 @@ def run() -> int:
         targets = win._targets()
         if slot < 0 or slot >= len(targets):
             win.status_label.setText(
-                f"Slot {slot + 1} tidak tersedia pada layout {win.layout_count} jendela"
+                f"Slot {slot + 1} tidak tersedia pada Monitor {win.selected_monitor + 1} "
+                f"({win.layout_count} slot)"
             )
             return
 
@@ -48,7 +48,7 @@ def run() -> int:
             win.refresh_windows()
             win._select_handle_in_list(active.handle)
             win.status_label.setText(
-                f"Hotkey: {active.title[:32]} → Slot {slot + 1}"
+                f"Hotkey: {active.title[:28]} → Monitor {win.selected_monitor + 1}, Slot {slot + 1}"
             )
 
     hotkeys = HotkeyController(app, int(win.winId()), move_foreground_to_slot, 9)
@@ -65,21 +65,21 @@ def run() -> int:
             win.refresh_windows()
             win._select_handle_in_list(active.handle)
             win.status_label.setText(
-                f"Zona: {active.title[:30]} → Monitor {monitor_index + 1}, Slot {slot + 1}"
+                f"Zona: {active.title[:28]} → Monitor {monitor_index + 1}, Slot {slot + 1}"
             )
 
-    zones = WindowDragZoneController(win, snap_dragged_window)
+    zones = MultiMonitorDragZoneController(win, snap_dragged_window)
     win.zone_controller = zones
     app.aboutToQuit.connect(zones.close)
 
     if IS_WINDOWS:
         if hotkeys.registered_count == 9:
             win.status_label.setText(
-                "Zona drag aktif • Hotkey Ctrl+Alt+1 sampai Ctrl+Alt+9"
+                "Multi-monitor aktif • Zona drag • Hotkey Ctrl+Alt+1 sampai Ctrl+Alt+9"
             )
         else:
             win.status_label.setText(
-                f"Zona drag aktif • Hotkey {hotkeys.registered_count}/9 tersedia"
+                f"Multi-monitor aktif • Zona drag • Hotkey {hotkeys.registered_count}/9 tersedia"
             )
 
     return app.exec()
