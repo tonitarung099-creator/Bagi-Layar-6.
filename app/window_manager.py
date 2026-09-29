@@ -13,6 +13,7 @@ class WindowInfo:
     handle: int
     title: str
     class_name: str = ""
+    process_name: str = ""
 
 
 IS_WINDOWS = os.name == "nt"
@@ -23,6 +24,7 @@ DWMWA_CLOAKED = 14
 
 if IS_WINDOWS:
     user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
     try:
         dwmapi = ctypes.windll.dwmapi
     except Exception:
@@ -43,6 +45,7 @@ if IS_WINDOWS:
     MOD_ALT = 0x0001
     MOD_CONTROL = 0x0002
     MOD_NOREPEAT = 0x4000
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
 
 def _is_cloaked(hwnd) -> bool:
@@ -60,6 +63,35 @@ def _is_cloaked(hwnd) -> bool:
         return result == 0 and bool(cloaked.value)
     except Exception:
         return False
+
+
+def _process_name_for_window(hwnd) -> str:
+    """Nama executable pemilik HWND, contoh chrome.exe. Aman jika akses ditolak."""
+    if not IS_WINDOWS:
+        return ""
+    pid = wintypes.DWORD(0)
+    process = None
+    try:
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            return ""
+        process = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+        if not process:
+            return ""
+        size = wintypes.DWORD(1024)
+        buffer = ctypes.create_unicode_buffer(size.value)
+        if not kernel32.QueryFullProcessImageNameW(process, 0, buffer, ctypes.byref(size)):
+            return ""
+        path = buffer.value.strip().replace("\\", "/")
+        return path.rsplit("/", 1)[-1] if path else ""
+    except Exception:
+        return ""
+    finally:
+        if process:
+            try:
+                kernel32.CloseHandle(process)
+            except Exception:
+                pass
 
 
 def _window_info(handle: int, exclude_handle: int | None = None) -> WindowInfo | None:
@@ -93,7 +125,12 @@ def _window_info(handle: int, exclude_handle: int | None = None) -> WindowInfo |
 
         class_buf = ctypes.create_unicode_buffer(256)
         user32.GetClassNameW(hwnd, class_buf, 256)
-        return WindowInfo(handle, title, class_buf.value)
+        return WindowInfo(
+            handle,
+            title,
+            class_buf.value,
+            _process_name_for_window(hwnd),
+        )
     except Exception:
         return None
 
