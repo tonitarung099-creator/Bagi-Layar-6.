@@ -5,8 +5,15 @@ Aplikasi Windows untuk membagi dan menyusun jendela ke beberapa slot pada satu a
 ## Fitur saat ini
 
 - Deteksi monitor Windows otomatis: Monitor 1, 2, 3, dan seterusnya.
+- Setiap monitor memiliki profile layout independen.
+- Contoh: Monitor 1 = 6 slot, Monitor 2 = 4 slot, Monitor 3 = 2 slot.
+- Layout, margin, gap, area taskbar, dan Kunci Layout disimpan terpisah untuk masing-masing monitor.
+- Tab monitor menampilkan jumlah slot aktif agar konfigurasi mudah dibedakan.
 - Preset layout 2, 3, 4, 6, 8, dan 9 jendela.
 - Layout kustom baris × kolom.
+- Identitas monitor disimpan menggunakan informasi layar, sehingga profile tidak hanya bergantung pada urutan tab.
+- Workspace lama tetap kompatibel dan otomatis diperlakukan sebagai konfigurasi monitor aktif saat disimpan ulang.
+- Workspace baru menyimpan konfigurasi dan assignment jendela untuk semua monitor sekaligus.
 - Margin luar dan jarak antar jendela.
 - Pilihan menghormati area taskbar atau memakai seluruh layar.
 - Deteksi jendela aktif menggunakan Win32 API.
@@ -14,33 +21,46 @@ Aplikasi Windows untuk membagi dan menyusun jendela ke beberapa slot pada satu a
 - Drag-and-drop jendela dari daftar langsung ke slot monitor.
 - Overlay zona otomatis seperti FancyZones saat jendela benar-benar sedang digeser.
 - Lepaskan jendela di atas zona untuk snap langsung ke slot terkait.
+- Overlay membaca layout monitor yang sedang berada di bawah pointer, bukan sekadar layout monitor aktif di UI.
 - Overlay mengikuti Monitor 1, 2, 3, dan seterusnya berdasarkan posisi pointer.
 - Overlay bersifat click-through dan tidak mengambil fokus dari jendela yang sedang digeser.
 - Double-click jendela untuk memasukkannya ke slot kosong pertama.
 - Multi-select lalu klik slot untuk mengisi beberapa slot secara berurutan.
 - Klik slot terisi untuk memilih jendela yang menempatinya.
-- Lepas assignment slot dan reset slot tanpa menutup jendela.
-- Hotkey global `Ctrl+Alt+1` sampai `Ctrl+Alt+9` untuk memindahkan jendela aktif langsung ke slot.
-- Kunci layout agar posisi jendela otomatis dipulihkan ketika berubah.
+- Lepas assignment slot tanpa menutup jendela.
+- Hotkey global `Ctrl+Alt+1` sampai `Ctrl+Alt+9` untuk memindahkan jendela aktif langsung ke slot pada monitor yang sedang dipilih di Bagi Layar.
+- Kunci layout bekerja lintas monitor; monitor yang Kunci Layout-nya nonaktif tidak dipaksa kembali.
 - Saat drag manual berlangsung, kunci layout dijeda sementara agar tidak melawan gerakan pengguna.
 - Simpan dan pulihkan banyak workspace.
 - UI Bahasa Indonesia.
-- Workflow GitHub Actions: validasi source/UI/overlay, tes engine layout, lalu build portable Windows.
+- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor, tes engine layout, lalu build portable Windows.
+
+## Cara pakai multi-monitor
+
+Contoh konfigurasi:
+
+- **Monitor 1** → pilih `6 Jendela`, margin 16 px, gap 12 px.
+- **Monitor 2** → klik tab Monitor 2 lalu pilih `4 Jendela`, margin 10 px, gap 8 px.
+- **Monitor 3** → klik tab Monitor 3 lalu pilih `2 Jendela`.
+
+Saat berpindah tab monitor, pengaturan monitor sebelumnya tetap tersimpan di memori workspace. Tekan **Simpan Workspace** untuk menyimpan seluruh konfigurasi monitor dan assignment jendela secara permanen.
+
+Saat **Pulihkan Workspace** ditekan, Bagi Layar mencoba mengembalikan jendela ke monitor dan slot masing-masing. Workspace format lama tetap dibaca dan dimigrasikan sebagai konfigurasi monitor aktif.
 
 ## Cara pakai cepat
 
 1. Buka aplikasi yang ingin disusun, lalu buka **Bagi Layar**.
-2. Pilih preset, misalnya **6 Jendela**.
+2. Pilih monitor dan preset yang diinginkan.
 3. Untuk cara paling cepat, seret jendela biasa melalui title bar. Ketika jendela mulai berpindah, zona layout akan muncul otomatis pada monitor di bawah pointer.
 4. Arahkan jendela ke zona yang diinginkan lalu lepaskan mouse. Jendela langsung masuk ke slot tersebut.
 5. Alternatif lain:
    - tekan **Susun Jendela** untuk menyusun beberapa jendela terpilih sekaligus;
    - tarik jendela dari daftar kiri langsung ke slot pada preview;
    - double-click jendela untuk memasukkannya ke slot kosong pertama;
-   - tekan `Ctrl+Alt+1` sampai `Ctrl+Alt+9` untuk memindahkan jendela aktif langsung ke slot terkait.
-6. Tekan **Simpan Workspace** jika susunan ingin digunakan lagi.
+   - tekan `Ctrl+Alt+1` sampai `Ctrl+Alt+9` untuk memindahkan jendela aktif langsung ke slot terkait pada monitor aktif.
+6. Tekan **Simpan Workspace** jika seluruh susunan multi-monitor ingin digunakan lagi.
 
-Hotkey yang slotnya tidak tersedia pada layout aktif akan diabaikan dan statusnya ditampilkan di bagian bawah aplikasi.
+Hotkey yang slotnya tidak tersedia pada layout monitor aktif akan diabaikan dan statusnya ditampilkan di bagian bawah aplikasi.
 
 ## Menjalankan dari source
 
