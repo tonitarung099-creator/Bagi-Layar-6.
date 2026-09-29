@@ -6,3 +6,5 @@ dist/
 *.spec
 .idea/
 .vscode/
+config/*
+!config/.gitkeep
