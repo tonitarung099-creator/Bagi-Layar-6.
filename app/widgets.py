@@ -13,8 +13,10 @@ WINDOW_MIME = "application/x-bagi-layar-window-handle"
 class WindowListWidget(QListWidget):
     """Daftar jendela yang dapat ditarik langsung ke preview slot."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, objectName: str | None = None):
         super().__init__(parent)
+        if objectName:
+            self.setObjectName(objectName)
         self.setDragEnabled(True)
         self.setDefaultDropAction(Qt.MoveAction)
 
