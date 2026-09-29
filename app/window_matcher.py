@@ -33,6 +33,16 @@ def _class_name(window) -> str:
     return str(getattr(window, "class_name", "") or "").strip().casefold()
 
 
+def _runner_ids(title: str) -> set[int]:
+    values = set()
+    for raw in re.findall(r"\brunner\s*[-#:]?\s*0*(\d+)\b", title, flags=re.IGNORECASE):
+        try:
+            values.add(int(raw))
+        except Exception:
+            pass
+    return values
+
+
 def window_match_score(saved: dict, window) -> float:
     """Nilai 0..1.5; 0 berarti kandidat sebaiknya tidak dipakai."""
     saved_title = normalize_title(saved.get("title", ""))
@@ -43,6 +53,11 @@ def window_match_score(saved: dict, window) -> float:
     current_process = _process_name(window)
 
     if not saved_title or not current_title:
+        return 0.0
+
+    saved_runner_ids = _runner_ids(saved_title)
+    current_runner_ids = _runner_ids(current_title)
+    if saved_runner_ids and current_runner_ids and saved_runner_ids != current_runner_ids:
         return 0.0
 
     title_exact = saved_title == current_title
@@ -113,6 +128,11 @@ def find_best_window(saved: dict, windows: Iterable, used_handles: set[int] | No
             if process_ok and class_ok:
                 same_identity.append(window)
         if len(same_identity) == 1:
-            return same_identity[0]
+            candidate = same_identity[0]
+            saved_runner_ids = _runner_ids(normalize_title(saved.get("title", "")))
+            current_runner_ids = _runner_ids(normalize_title(getattr(candidate, "title", "")))
+            if saved_runner_ids and current_runner_ids and saved_runner_ids != current_runner_ids:
+                return None
+            return candidate
 
     return None
