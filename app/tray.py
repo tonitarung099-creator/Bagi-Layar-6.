@@ -18,6 +18,7 @@ class TrayController(QObject):
         self.hotkeys = hotkeys
         self.zones = zones
         self.auto_restore_controller = None
+        self.workspace_watch_controller = None
         self.settings = QSettings(
             str(config_file("settings.ini")),
             QSettings.Format.IniFormat,
@@ -65,6 +66,16 @@ class TrayController(QObject):
         )
         self.auto_restore_action.toggled.connect(self._set_auto_restore_enabled)
         self.menu.addAction(self.auto_restore_action)
+
+        self.workspace_watch_action = QAction(
+            "Pantau workspace terus-menerus", self.menu
+        )
+        self.workspace_watch_action.setCheckable(True)
+        self.workspace_watch_action.setChecked(
+            self.settings.value("watch_workspace", False, bool)
+        )
+        self.workspace_watch_action.toggled.connect(self._set_workspace_watch_enabled)
+        self.menu.addAction(self.workspace_watch_action)
 
         self.startup_action = QAction("Mulai bersama Windows", self.menu)
         self.startup_action.setCheckable(True)
@@ -115,6 +126,16 @@ class TrayController(QObject):
             self.auto_restore_action.blockSignals(True)
             self.auto_restore_action.setChecked(enabled)
             self.auto_restore_action.blockSignals(False)
+        except Exception:
+            pass
+
+    def bind_workspace_watch(self, controller) -> None:
+        self.workspace_watch_controller = controller
+        try:
+            enabled = bool(controller.is_enabled())
+            self.workspace_watch_action.blockSignals(True)
+            self.workspace_watch_action.setChecked(enabled)
+            self.workspace_watch_action.blockSignals(False)
         except Exception:
             pass
 
@@ -267,6 +288,24 @@ class TrayController(QObject):
                 else "Auto-restore workspace nonaktif"
             )
 
+    def _set_workspace_watch_enabled(self, enabled: bool) -> None:
+        enabled = bool(enabled)
+        self.settings.setValue("watch_workspace", enabled)
+        self.settings.sync()
+        controller = self.workspace_watch_controller
+        if controller is not None:
+            controller.set_enabled(enabled)
+            if enabled:
+                controller.start()
+            else:
+                controller.stop()
+        if hasattr(self.window, "status_label"):
+            self.window.status_label.setText(
+                "Pantau workspace aktif"
+                if enabled
+                else "Pantau workspace nonaktif"
+            )
+
     def notify_auto_restore_finished(self, success: bool, current: int, expected: int) -> None:
         if success:
             title = "Workspace otomatis dipulihkan"
@@ -285,6 +324,22 @@ class TrayController(QObject):
                 message,
                 QSystemTrayIcon.MessageIcon.Information,
                 2800,
+            )
+
+    def notify_workspace_recovered(self, moved: int, missing: int, offline: int) -> None:
+        message = f"{moved} jendela baru dikembalikan ke slot workspace."
+        if missing:
+            message += f" {missing} slot masih menunggu jendela."
+        if offline:
+            message += f" {offline} monitor masih offline."
+        if hasattr(self.window, "status_label"):
+            self.window.status_label.setText(f"Pantau workspace • {message}")
+        if self.available:
+            self.tray.showMessage(
+                "Workspace diperbaiki otomatis",
+                message,
+                QSystemTrayIcon.MessageIcon.Information,
+                1800,
             )
 
     def _set_startup_enabled(self, enabled: bool) -> None:
@@ -321,7 +376,7 @@ class TrayController(QObject):
         if not self._notice_shown:
             self.tray.showMessage(
                 "Bagi Layar tetap aktif",
-                "Zona drag dan hotkey tetap berjalan dari system tray.",
+                "Zona drag, hotkey, dan pemantau workspace tetap berjalan dari system tray.",
                 QSystemTrayIcon.MessageIcon.Information,
                 2500,
             )
@@ -363,6 +418,11 @@ class TrayController(QObject):
         if self.auto_restore_controller is not None:
             try:
                 self.auto_restore_controller.stop()
+            except Exception:
+                pass
+        if self.workspace_watch_controller is not None:
+            try:
+                self.workspace_watch_controller.stop()
             except Exception:
                 pass
         self.settings.sync()
