@@ -45,6 +45,7 @@ jobs:
           python -c "from PySide6.QtWidgets import QApplication; from app.multi_monitor import MultiMonitorMainWindow; app=QApplication([]); win=MultiMonitorMainWindow(); assert len(win._targets()) >= 1; win.close(); print('Multi-monitor window OK')"
           python -c "from PySide6.QtWidgets import QApplication; from app.multi_monitor import MultiMonitorMainWindow; from app.tray import TrayController; app=QApplication([]); win=MultiMonitorMainWindow(); tray=TrayController(app,win,None,None); assert tray.open_action.text()=='Buka Bagi Layar'; assert tray.startup_action.text()=='Mulai bersama Windows'; tray.close(); win.close(); print('System tray controller OK')"
           python -c "from app.startup import startup_command; cmd=startup_command(); assert '--tray' in cmd; print('Portable auto-start command OK:', cmd)"
+          python -c "from PySide6.QtWidgets import QApplication; from app.single_instance import SingleInstanceManager; app=QApplication([]); a=SingleInstanceManager(); assert a.acquire_or_notify(); b=SingleInstanceManager(); assert not b.acquire_or_notify(); [app.processEvents() for _ in range(5)]; assert a.consume_pending_show(); a.close(); print('Single-instance IPC OK')"
 
       - name: Tes engine layout
         shell: pwsh
