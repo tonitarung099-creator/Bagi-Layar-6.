@@ -18,6 +18,7 @@ class SingleInstanceManager(QObject):
         self._clients: list[QLocalSocket] = []
         self.name = self._server_name()
         self._primary = False
+        self._pending_show = False
 
     @staticmethod
     def _server_name() -> str:
@@ -73,8 +74,14 @@ class SingleInstanceManager(QObject):
     def _read_client(self, client: QLocalSocket) -> None:
         payload = bytes(client.readAll()).decode("utf-8", errors="ignore").strip().upper()
         if "SHOW" in payload:
+            self._pending_show = True
             self.show_requested.emit()
         client.disconnectFromServer()
+
+    def consume_pending_show(self) -> bool:
+        value = self._pending_show
+        self._pending_show = False
+        return value
 
     def _drop_client(self, client: QLocalSocket) -> None:
         try:
