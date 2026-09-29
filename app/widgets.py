@@ -1,16 +1,49 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import QMimeData, QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QDrag, QFont, QLinearGradient, QPainter, QPainterPath, QPen
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout, QWidget
 
 from .layouts import grid_shape
+
+
+WINDOW_MIME = "application/x-bagi-layar-window-handle"
+
+
+class WindowListWidget(QListWidget):
+    """Daftar jendela yang dapat ditarik langsung ke preview slot."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragEnabled(True)
+        self.setDefaultDropAction(Qt.MoveAction)
+
+    def startDrag(self, supported_actions):
+        item = self.currentItem()
+        if item is None:
+            selected = self.selectedItems()
+            item = selected[0] if selected else None
+        if item is None:
+            return
+
+        handle = item.data(Qt.UserRole)
+        if handle is None:
+            return
+
+        mime = QMimeData()
+        mime.setData(WINDOW_MIME, str(int(handle)).encode("ascii"))
+        mime.setText(item.text().split("\n", 1)[0])
+
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        drag.exec(Qt.MoveAction)
 
 
 class MonitorPreview(QWidget):
     """Preview monitor interaktif yang meniru mockup aplikasi."""
 
     slot_clicked = Signal(int)
+    window_dropped = Signal(int, int)  # handle, slot
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -20,8 +53,10 @@ class MonitorPreview(QWidget):
         self.gap = 12
         self.assignments: dict[int, str] = {}
         self.hover_slot = -1
+        self.drag_active = False
         self.setMinimumHeight(315)
         self.setMouseTracking(True)
+        self.setAcceptDrops(True)
         self.setCursor(Qt.PointingHandCursor)
 
     def set_layout_count(
@@ -49,7 +84,6 @@ class MonitorPreview(QWidget):
         self.update()
 
     def _screen_rect(self) -> QRectF:
-        # Sisakan ruang di bawah untuk stand seperti gambar acuan.
         bounds = self.rect().adjusted(20, 14, -20, -38)
         return QRectF(bounds)
 
@@ -83,12 +117,11 @@ class MonitorPreview(QWidget):
         painter.setClipPath(path)
 
         gradient = QLinearGradient(cell.topLeft(), cell.bottomRight())
-        gradient.setColorAt(0.0, QColor("#87bde9" if hovered else "#91c1e5"))
+        gradient.setColorAt(0.0, QColor("#a7d4f2" if hovered else "#91c1e5"))
         gradient.setColorAt(0.46, QColor("#377fd0"))
         gradient.setColorAt(1.0, QColor("#0759cf"))
         painter.fillRect(cell, gradient)
 
-        # Gelombang abstrak ala Windows 11, dibuat native agar tidak butuh aset gambar.
         waves = [
             (QColor(103, 181, 255, 190), 0.10, 0.48, 0.98, 1.02),
             (QColor(25, 112, 238, 190), 0.02, 0.62, 0.84, 0.92),
@@ -106,7 +139,6 @@ class MonitorPreview(QWidget):
             )
             painter.drawEllipse(r)
 
-        # Highlight lembut.
         shine = QLinearGradient(QPointF(cell.left(), cell.top()), QPointF(cell.right(), cell.bottom()))
         shine.setColorAt(0.0, QColor(255, 255, 255, 65))
         shine.setColorAt(0.55, QColor(255, 255, 255, 0))
@@ -119,7 +151,6 @@ class MonitorPreview(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         screen = self._screen_rect()
 
-        # Bayangan tipis dan frame monitor.
         shadow = screen.translated(0, 4).adjusted(-3, -3, 3, 3)
         painter.setPen(Qt.NoPen)
         painter.setBrush(QColor(10, 24, 40, 38))
@@ -132,10 +163,14 @@ class MonitorPreview(QWidget):
             hovered = index == self.hover_slot
             self._wallpaper(painter, cell, hovered)
             painter.setBrush(Qt.NoBrush)
-            painter.setPen(QPen(QColor("#78b8ff" if hovered else "#4ea2ff"), 2.2 if hovered else 1.4))
+            painter.setPen(QPen(QColor("#b9ddff" if hovered else "#4ea2ff"), 3.0 if hovered else 1.4))
             painter.drawRoundedRect(cell, 5, 5)
 
-            # Nomor slot.
+            if hovered and self.drag_active:
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QColor(255, 255, 255, 36))
+                painter.drawRoundedRect(cell.adjusted(2, 2, -2, -2), 4, 4)
+
             badge = max(32.0, min(cell.width(), cell.height()) * 0.26)
             cx, cy = cell.center().x(), cell.center().y()
             painter.setPen(Qt.NoPen)
@@ -152,7 +187,6 @@ class MonitorPreview(QWidget):
                 str(index + 1),
             )
 
-            # Nama jendela di bagian bawah slot jika sudah dipetakan.
             label = self.assignments.get(index)
             if label:
                 pill = cell.adjusted(8, cell.height() - 29, -8, -6)
@@ -165,9 +199,11 @@ class MonitorPreview(QWidget):
                 painter.setFont(small)
                 painter.drawText(pill.adjusted(7, 0, -7, 0), Qt.AlignCenter | Qt.TextSingleLine, label[:27])
 
-        # Leher dan kaki monitor.
         painter.setPen(Qt.NoPen)
-        base_gradient = QLinearGradient(QPointF(screen.center().x(), screen.bottom()), QPointF(screen.center().x(), screen.bottom() + 30))
+        base_gradient = QLinearGradient(
+            QPointF(screen.center().x(), screen.bottom()),
+            QPointF(screen.center().x(), screen.bottom() + 30),
+        )
         base_gradient.setColorAt(0, QColor("#767b82"))
         base_gradient.setColorAt(1, QColor("#3e4248"))
         painter.setBrush(base_gradient)
@@ -189,8 +225,9 @@ class MonitorPreview(QWidget):
         super().mouseMoveEvent(event)
 
     def leaveEvent(self, event):
-        self.hover_slot = -1
-        self.update()
+        if not self.drag_active:
+            self.hover_slot = -1
+            self.update()
         super().leaveEvent(event)
 
     def mousePressEvent(self, event):
@@ -199,6 +236,53 @@ class MonitorPreview(QWidget):
             if slot >= 0:
                 self.slot_clicked.emit(slot)
         super().mousePressEvent(event)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat(WINDOW_MIME):
+            self.drag_active = True
+            self.hover_slot = self._slot_at(event.position())
+            event.acceptProposedAction()
+            self.update()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if not event.mimeData().hasFormat(WINDOW_MIME):
+            event.ignore()
+            return
+        slot = self._slot_at(event.position())
+        if slot != self.hover_slot:
+            self.hover_slot = slot
+            self.update()
+        if slot >= 0:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self.drag_active = False
+        self.hover_slot = -1
+        self.update()
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        slot = self._slot_at(event.position())
+        try:
+            raw = bytes(event.mimeData().data(WINDOW_MIME)).decode("ascii")
+            handle = int(raw)
+        except (TypeError, ValueError, UnicodeDecodeError):
+            event.ignore()
+            return
+
+        self.drag_active = False
+        self.hover_slot = -1
+        self.update()
+        if slot < 0:
+            event.ignore()
+            return
+
+        self.window_dropped.emit(handle, slot)
+        event.acceptProposedAction()
 
 
 class LayoutButton(QPushButton):
@@ -243,8 +327,7 @@ class LayoutButton(QPushButton):
 
         if self.count <= 0:
             painter.setBrush(Qt.NoBrush)
-            pen = QPen(icon_color, 1.5, Qt.DashLine)
-            painter.setPen(pen)
+            painter.setPen(QPen(icon_color, 1.5, Qt.DashLine))
             painter.drawRoundedRect(icon_area.adjusted(6, 0, -6, 0), 3, 3)
         else:
             rows, cols = grid_shape(self.count)
@@ -261,7 +344,11 @@ class LayoutButton(QPushButton):
         font.setPointSizeF(9.2)
         font.setBold(selected)
         painter.setFont(font)
-        painter.drawText(QRectF(rect.x() + 3, rect.bottom() - 29, rect.width() - 6, 22), Qt.AlignCenter, self.label)
+        painter.drawText(
+            QRectF(rect.x() + 3, rect.bottom() - 29, rect.width() - 6, 22),
+            Qt.AlignCenter,
+            self.label,
+        )
 
 
 class ActionCard(QFrame):
