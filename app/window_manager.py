@@ -16,6 +16,8 @@ class WindowInfo:
 
 
 IS_WINDOWS = os.name == "nt"
+WM_HOTKEY = 0x0312
+HOTKEY_BASE_ID = 0xB600
 
 if IS_WINDOWS:
     user32 = ctypes.windll.user32
@@ -32,6 +34,43 @@ if IS_WINDOWS:
     SWP_NOACTIVATE = 0x0010
     GWL_EXSTYLE = -20
     WS_EX_TOOLWINDOW = 0x00000080
+    MOD_ALT = 0x0001
+    MOD_CONTROL = 0x0002
+    MOD_NOREPEAT = 0x4000
+
+
+def _window_info(handle: int, exclude_handle: int | None = None) -> WindowInfo | None:
+    if not IS_WINDOWS:
+        return None
+    hwnd = wintypes.HWND(handle)
+    try:
+        if exclude_handle and handle == int(exclude_handle):
+            return None
+        if not user32.IsWindow(hwnd) or not user32.IsWindowVisible(hwnd):
+            return None
+        if user32.GetParent(hwnd):
+            return None
+        try:
+            ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            if ex_style & WS_EX_TOOLWINDOW:
+                return None
+        except Exception:
+            pass
+
+        length = user32.GetWindowTextLengthW(hwnd)
+        if length <= 0:
+            return None
+        title_buf = ctypes.create_unicode_buffer(length + 1)
+        user32.GetWindowTextW(hwnd, title_buf, length + 1)
+        title = title_buf.value.strip()
+        if not title:
+            return None
+
+        class_buf = ctypes.create_unicode_buffer(256)
+        user32.GetClassNameW(hwnd, class_buf, 256)
+        return WindowInfo(handle, title, class_buf.value)
+    except Exception:
+        return None
 
 
 def list_windows(exclude_handle: int | None = None) -> list[WindowInfo]:
@@ -42,33 +81,27 @@ def list_windows(exclude_handle: int | None = None) -> list[WindowInfo]:
     EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
 
     def callback(hwnd, _lparam):
-        handle = int(hwnd)
-        if exclude_handle and handle == int(exclude_handle):
-            return True
-        if not user32.IsWindowVisible(hwnd) or user32.GetParent(hwnd):
-            return True
-        try:
-            ex_style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            if ex_style & WS_EX_TOOLWINDOW:
-                return True
-        except Exception:
-            pass
-        length = user32.GetWindowTextLengthW(hwnd)
-        if length <= 0:
-            return True
-        title_buf = ctypes.create_unicode_buffer(length + 1)
-        user32.GetWindowTextW(hwnd, title_buf, length + 1)
-        title = title_buf.value.strip()
-        if not title:
-            return True
-        class_buf = ctypes.create_unicode_buffer(256)
-        user32.GetClassNameW(hwnd, class_buf, 256)
-        windows.append(WindowInfo(handle, title, class_buf.value))
+        info = _window_info(int(hwnd), exclude_handle)
+        if info is not None:
+            windows.append(info)
         return True
 
     callback_ref = EnumWindowsProc(callback)
     user32.EnumWindows(callback_ref, 0)
     return windows
+
+
+def get_foreground_window(exclude_handle: int | None = None) -> WindowInfo | None:
+    """Ambil jendela foreground saat ini tanpa mengubah fokus."""
+    if not IS_WINDOWS:
+        return None
+    try:
+        hwnd = user32.GetForegroundWindow()
+        if not hwnd:
+            return None
+        return _window_info(int(hwnd), exclude_handle)
+    except Exception:
+        return None
 
 
 def move_window(handle: int, rect: Rect) -> bool:
@@ -80,7 +113,17 @@ def move_window(handle: int, rect: Rect) -> bool:
             return False
         if user32.IsIconic(hwnd):
             user32.ShowWindow(hwnd, SW_RESTORE)
-        return bool(user32.SetWindowPos(hwnd, 0, int(rect.x), int(rect.y), max(1, int(rect.width)), max(1, int(rect.height)), SWP_NOZORDER | SWP_NOACTIVATE))
+        return bool(
+            user32.SetWindowPos(
+                hwnd,
+                0,
+                int(rect.x),
+                int(rect.y),
+                max(1, int(rect.width)),
+                max(1, int(rect.height)),
+                SWP_NOZORDER | SWP_NOACTIVATE,
+            )
+        )
     except Exception:
         return False
 
@@ -92,3 +135,46 @@ def window_exists(handle: int) -> bool:
         return bool(user32.IsWindow(wintypes.HWND(handle)))
     except Exception:
         return False
+
+
+def register_slot_hotkeys(window_handle: int, slot_count: int = 9) -> dict[int, int]:
+    """Daftarkan Ctrl+Alt+1..9. Return mapping hotkey_id -> slot index."""
+    if not IS_WINDOWS:
+        return {}
+
+    mapping: dict[int, int] = {}
+    hwnd = wintypes.HWND(window_handle)
+    modifiers = MOD_CONTROL | MOD_ALT | MOD_NOREPEAT
+    for slot in range(max(0, min(9, slot_count))):
+        hotkey_id = HOTKEY_BASE_ID + slot
+        virtual_key = ord("1") + slot
+        try:
+            if user32.RegisterHotKey(hwnd, hotkey_id, modifiers, virtual_key):
+                mapping[hotkey_id] = slot
+        except Exception:
+            continue
+    return mapping
+
+
+def unregister_hotkeys(window_handle: int, hotkey_ids) -> None:
+    if not IS_WINDOWS:
+        return
+    hwnd = wintypes.HWND(window_handle)
+    for hotkey_id in list(hotkey_ids):
+        try:
+            user32.UnregisterHotKey(hwnd, int(hotkey_id))
+        except Exception:
+            pass
+
+
+def native_hotkey_id(message) -> int | None:
+    """Ekstrak hotkey id dari native Windows MSG milik Qt."""
+    if not IS_WINDOWS:
+        return None
+    try:
+        msg = wintypes.MSG.from_address(int(message))
+        if int(msg.message) == WM_HOTKEY:
+            return int(msg.wParam)
+    except Exception:
+        return None
+    return None
