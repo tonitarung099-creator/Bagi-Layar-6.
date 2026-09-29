@@ -1,0 +1,157 @@
+PLAN IMPLEMENTASI SOL — BAGI LAYAR: PENYAMAAN UI DAN PERBAIKAN BUG
+Audit Astra, 29 September 2026
+
+REPO DAN BATAS PEKERJAAN
+Repo: https://github.com/tonitarung099-creator/Bagi-Layar-6.
+Branch yang diaudit: main
+Commit: a726bcc3c2201e089209e55261f75ccc137b8039
+Gambar acuan: Gambar ChatGPT 29 Sep 2026, 11.48.29.png (1672 × 941 piksel).
+
+Astra sudah melakukan audit, belum mengubah source, commit, atau push perbaikan. Tugas Sol adalah mengimplementasikan plan ini, bukan hanya menyusun rencana lagi. Periksa HEAD terbaru sebelum bekerja; jika kode berubah, cocokkan ulang setiap temuan agar perbaikan yang sudah ada tidak ditimpa.
+
+Tujuan: UI mengikuti gambar sedekat mungkin hingga detail komponen; fungsi pembagian jendela, workspace, multi-monitor, lock, hotkey, drag zone, tray, dan pemulihan tetap benar. Pertahankan aplikasi Python/PySide6, Bahasa Indonesia, dan distribusi Windows portable folder multi-file ZIP: extract lalu jalankan EXE tanpa instalasi Python atau admin. Jangan mengubah menjadi aplikasi web, installer, atau EXE single-file.
+
+KESIMPULAN AUDIT
+UI BELUM SAMA PERSIS. Susunan besarnya sudah sesuai: sidebar kiri, preview di tengah, pengaturan kanan, dan empat aksi di bawah. Namun wallpaper, logo, ikon, tipografi, toggle lock, daftar jendela, header, status bar, dan proporsi masih berbeda. Pada ukuran kecil terjadi overlap dan pemotongan tulisan.
+
+Selain perbedaan visual, ditemukan 11 masalah perilaku yang berhasil direproduksi dengan Qt offscreen dan data monitor/jendela simulasi. Ada temuan tambahan dari jalur kode Windows yang memerlukan pengujian Windows asli, terutama DPI dan perilaku minimize saat lock.
+
+Bukti dasar:
+- 18 tes bawaan lulus: QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests -v.
+- GitHub Actions commit yang diaudit sukses pada run 36522961055.
+- Kelulusan tersebut belum membuktikan bebas bug karena banyak interaksi belum diuji.
+- Lingkungan audit Linux, Qt offscreen. Font Windows/native title bar dan operasi Win32 nyata belum dinilai sebagai lolos.
+
+JALUR PRODUKSI YANG WAJIB DIPAHAMI
+main.py -> AppMainWindow (app/app_window.py) -> MultiMonitorMainWindow (app/multi_monitor.py) -> MainWindow (app/main_window.py).
+Semua regression test alur utama harus menguji jalur produksi AppMainWindow, bukan MainWindow saja.
+
+======================================================================
+A. TEMUAN BUG DAN PERBAIKAN WAJIB
+======================================================================
+
+B01 — P1 — Kunci layout nonaktif tetap memaksa posisi setelah Susun Jendela
+Penyebab: arrange_windows() mengisi locked_rects langsung dan _enforce_lock() mempercayai cache.
+Perbaikan: locked_rects harus diturunkan dari assignment + profile lock; arrange tidak menulis cache lock langsung; enforce memvalidasi monitor dan lock aktif.
+Lulus: lock off tetap off setelah arrange, restore, drag, hotkey, dan pergantian monitor.
+
+B02 — P1 — Susun Jendela merusak konsistensi assignment lintas monitor
+Penyebab: jalur base mengubah map aktif tanpa _remove_handle_from_all_monitors() dan mengosongkan cache global.
+Perbaikan: satu layanan penempatan untuk arrange/klik/double-click/drag/hotkey/restore; satu handle hanya satu assignment global; state lama baru dilepas setelah move sukses; rebuild lock seluruh monitor setelah batch; reset monitor aktif tidak menghapus lock monitor lain.
+
+B03 — P1 — Identitas monitor berubah ketika resolusi berubah
+Bukti audit: SERIAL1|1920x1080#1 menjadi SERIAL1|1600x1080#1.
+Perbaikan: identitas utama tidak boleh memasukkan resolusi, ukuran logical, koordinat, atau urutan enumerate; gunakan serial/metadata display stabil; fallback ambigu tidak boleh menggabungkan dua monitor berbeda; migrasikan key lama aman.
+
+B04 — P1 — Cabut monitor meninggalkan koordinat lock kedaluwarsa
+Perbaikan: suspend enforcement saat topologi berubah; pilih monitor berdasarkan key stabil; tangani geometryChanged/availableGeometryChanged/DPI/add/remove; monitor offline tetap tersimpan tanpa dipaksa; label offline tidak fallback menjadi Monitor 1.
+
+B05 — P1 — Watcher menimpa perubahan layout aktif dengan profile tersimpan
+Perbaikan: watcher hanya mengisi assignment yang hilang, tidak menulis layout/margin/gap/lock edit pengguna; saved definition, active state, dan unsaved edits dipisahkan; release/reset disengaja tidak langsung dipulihkan watcher.
+
+B06 — P1 — Simpan workspace bisa menghapus slot monitor offline/belum terpulihkan
+Perbaikan: pisahkan saved slot intent dari live HWND; slot belum tersedia dipertahankan sampai pengguna menghapus eksplisit; save menggabungkan state live ke definisi, bukan menggantikan semua slot; kegagalan save harus dilaporkan.
+
+B07 — P2 — Double-click daftar jendela selalu gagal
+Error: MainWindow._window_double_clicked() missing 1 required positional argument: '_column'.
+Perbaikan: signature handler mengikuti QListWidget.itemDoubleClicked(item); uji lewat signal Qt asli.
+
+B08 — P1 — Membatalkan Tambah Workspace dapat menghapus state aktif
+Perbaikan: dialog transactional; perubahan state hanya setelah nama valid dan create berhasil; cancel/nama kosong/duplikat tidak mengubah workspace/layout/selection/preview/assignments/profile/cache lock.
+
+B09 — P2 — Batal layout Kustom meninggalkan tombol pilihan salah
+Perbaikan: simpan pilihan lama dan commit setelah input baris+kolom diterima; cancel salah satu tahap mengembalikan layout dan highlight lama.
+
+B10 — P2 — Navigasi sidebar hanya mengganti checked state, tanpa aksi
+Perbaikan: button group eksklusif; Workspace fokus ke daftar workspace, Daftar Jendela fokus ke daftar jendela, Aksi Cepat fokus ke aksi; keyboard tetap bekerja; tidak membuat halaman baru yang mengubah komposisi acuan.
+
+B11 — P2 — Refresh tidak membersihkan slot jendela yang sudah ditutup
+Perbaikan: rekonsiliasi live assignment independen dari lock/watch; hanya HWND benar-benar mati dilepas dari live assignment; saved intent tetap ada; minimized/cloaked/access-denied tidak dianggap mati hanya karena tidak muncul di daftar visible.
+
+B12 — P1 — Koordinat Qt logical dicampur dengan koordinat native Windows
+Perbaikan: engine penempatan memakai koordinat native Win32; overlay/pointer dikonversi per-monitor; dukung origin negatif, taskbar berbagai sisi, portrait, mixed DPI 100/125/150/200%.
+Status audit: wajib verifikasi Windows asli.
+
+B13 — P2 — Kunci layout terus move dan dapat memulihkan minimize paksa
+Perbaikan: background enforcement membandingkan geometri dahulu, tidak SetWindowPos jika sudah cocok; minimize/maximize tidak dibatalkan; jangan merebut fokus; enforcement berhenti selama drag dan pulih setelah drag selesai/batal.
+Status audit: perilaku OS wajib verifikasi Windows asli.
+
+======================================================================
+B. PERBANDINGAN UI DAN SPESIFIKASI IMPLEMENTASI
+======================================================================
+
+U01 — Tata letak besar/responsif
+Gunakan constraint responsif; monitor strip dan preset dapat scroll horizontal; daftar jendela scroll; preview mengecil proporsional; pengaturan scroll vertikal. Uji 1566×914, 1600×920, 1366×768, 1280×720 dan effective desktop saat scaling. Jangan hanya menaikkan minimum size.
+
+U02 — Wallpaper dan monitor preview
+Gunakan wallpaper lipatan biru seperti Windows 11, bezel realistis, kaki monitor, badge nomor besar. Wallpaper, nomor/status/overlay harus terpisah dan slot tetap interaktif. Preview mengikuti rasio monitor nyata.
+
+U03 — Logo, ikon navigasi, ikon aplikasi
+Ganti simbol Unicode generik dengan ikon vektor/QIcon konsisten; ikon aplikasi memakai sumber Windows/fallback generik, bukan hardcode Chrome.
+
+U04 — Header dan window chrome
+Komposisi header mengikuti acuan. Perilaku drag/maximize/resize/system menu/snap Windows tidak boleh rusak hanya demi tampilan.
+
+U05 — Sidebar, workspace, daftar jendela
+Workspace aktif biru muda, separator halus, tombol + dan tiga titik; row jendela ringkas dua tingkat, ellipsis/tooltip, multi-select dan drag dipertahankan. Slot/monitor menunjukkan assignment nyata.
+
+U06 — Monitor aktif
+Monitor tab dinamis dengan ikon + dua label; selected state jelas; Tambah / Monitor Lain punya aksi membuka pengaturan Display Windows/fallback petunjuk; jangan memalsukan jumlah monitor fisik.
+
+U07 — Pengaturan kanan
+Label-control konsisten, slider biru, angka px, separator, ToggleSwitch dengan thumb putih; dropdown resolusi tetap informatif/deteksi, tidak menjadi pilihan palsu.
+
+U08 — Preset layout
+Pertahankan 2,3,4,6,8,9,Kustom; selected/border/radius/jarak mengikuti acuan; horizontal scroll bila sempit.
+
+U09 — Empat kartu aksi
+Satu kartu biru Susun Jendela + tiga putih; gunakan tombol semantik/focusable yang bekerja dengan Enter/Space; feedback jumlah berhasil/gagal.
+
+U10 — Status bar
+Dot hijau jumlah monitor, daftar monitor+resolusi, status Siap digunakan dan info; detail engine panjang dipindahkan ke tooltip/tray.
+
+U11 — Tipografi, warna, proporsi
+Segoe UI/Segoe UI Variable; judul aplikasi ~20 px; section 16–18 px; row title ~14 px; subtitle 12–13 px; aksen ~#0B73FF; selected biru muda; panel putih kebiruan; border tipis; radius ~12–16 px.
+
+Patokan geometri gambar acuan:
+- Batas luar jendela x≈56,y≈14, ukuran≈1566×914.
+- Panel tengah x≈354,y≈86, ukuran≈899×686.
+- Panel kanan x≈1262,y≈86, ukuran≈346×686.
+- Aksi cepat x≈354,y≈782, ukuran≈1254×106.
+- Sidebar sekitar 285 px; header sekitar 72 px; status bar sekitar 40 px; jarak antarpanel 10–15 px.
+
+======================================================================
+C. URUTAN IMPLEMENTASI SOL
+======================================================================
+Tahap 1 — Bekukan baseline dan tulis regression test B01–B11.
+Tahap 2 — Benahi model/engine: satu sumber state; saved intent/live assignment/profile aktif/cache lock dipisah.
+Tahap 3 — Stabilkan monitor dan DPI; Win32 adapter dengan tipe handle/pointer jelas.
+Tahap 4 — Perbaiki double-click, dialog transactional, navigasi, keyboard/drag/context feedback.
+Tahap 5 — Bangun UI mengikuti acuan dan perbarui docs/UI_SPEC.md.
+Tahap 6 — Jalankan tes, screenshot Windows, overlay/diff terhadap referensi, uji portable hasil build, upload ZIP dan dokumentasikan keterbatasan.
+
+======================================================================
+D. MATRIKS PENERIMAAN
+======================================================================
+1. UI baseline: tiga monitor simulasi/enam row/default 6/margin16/gap12/lock aktif, tanpa overlap.
+2. UI kecil: 1366×768 dan 1280×720 tetap dapat diakses tanpa overlap.
+3. Monitor dinamis: 1/2/3/>3, portrait, negative origin, reorder, disconnect/reconnect.
+4. Layout: semua preset+kustom; cancel tahap 1/2 mempertahankan pilihan lama.
+5. Assignment: semua jalur satu aturan; satu handle satu slot global; partial failure tidak merusak monitor lain.
+6. Lock: off tetap off; on hanya mengoreksi bila perlu; offline tidak ditarget; minimize tidak dipaksa restore.
+7. Workspace: round-trip, restart, title berubah, aplikasi belum dibuka, monitor offline, cancel workspace baru, migrasi format lama.
+8. Watcher: tidak menimpa edit aktif dan tidak membatalkan release/reset disengaja.
+9. Windows/DPI: 100/125/150/200 mixed DPI; overlay hover dan hasil move sama; taskbar dihormati.
+10. Portable: Windows 11 tanpa Python/admin; folder berspasi/non-ASCII; pindah folder; config/assets/tray/hotkey/single-instance berfungsi.
+
+Kriteria selesai:
+- B01–B11 mempunyai regression test yang gagal sebelum perbaikan dan lolos sesudahnya.
+- UI dibandingkan dengan screenshot acuan pada fixture sama; sisa perbedaan dijelaskan dan tidak diklaim sama persis tanpa bukti.
+- B12/B13 diverifikasi di Windows atau dinyatakan jujur belum teruji.
+- Tes lama tetap lulus, build sukses, portable benar-benar dapat dijalankan.
+- Tidak ada fitur yang dihapus diam-diam demi tampilan.
+
+REFERENSI UTAMA
+Source commit: https://github.com/tonitarung099-creator/Bagi-Layar-6./tree/a726bcc3c2201e089209e55261f75ccc137b8039
+Qt High DPI: https://doc.qt.io/qt-6/highdpi.html
+Gambar acuan harus diberikan ke proses verifikasi visual; tiga monitor di mockup bukan asumsi perangkat nyata pengguna.
