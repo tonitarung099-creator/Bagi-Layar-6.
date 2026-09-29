@@ -61,6 +61,11 @@ jobs:
         run: |
           Set-Location $env:APP_SOURCE
           pyinstaller --noconfirm --clean --windowed --name "Bagi-Layar" main.py
+          New-Item -ItemType Directory -Force -Path "dist\Bagi-Layar\config" | Out-Null
+          @(
+            "Folder konfigurasi portable Bagi Layar.",
+            "workspace.json dan settings.ini akan dibuat otomatis di folder ini."
+          ) | Set-Content -Path "dist\Bagi-Layar\config\README.txt" -Encoding UTF8
 
       - name: Upload portable
         uses: actions/upload-artifact@v4
