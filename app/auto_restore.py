@@ -21,7 +21,10 @@ class StartupWorkspaceRestorer(QObject):
         initial_delay_ms: int = 3000,
         parent=None,
     ) -> None:
-        super().__init__(parent or window)
+        qt_parent = parent if isinstance(parent, QObject) else None
+        if qt_parent is None and isinstance(window, QObject):
+            qt_parent = window
+        super().__init__(qt_parent)
         self.window = window
         self.retry_interval_ms = max(1000, int(retry_interval_ms))
         self.max_attempts = max(1, int(max_attempts))
