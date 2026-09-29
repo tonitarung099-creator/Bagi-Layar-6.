@@ -35,20 +35,23 @@ Aplikasi Windows untuk membagi dan menyusun jendela ke beberapa slot pada satu a
 - **Target Monitor Hotkey** dapat dipilih langsung dari menu tray tanpa membuka UI utama.
 - Kunci layout bekerja lintas monitor; monitor yang Kunci Layout-nya nonaktif tidak dipaksa kembali.
 - Monitor yang sedang dicabut/offline diabaikan oleh Kunci Layout sehingga assignment-nya tidak salah dialihkan ke Monitor 1.
+- Restore workspace juga melewati monitor offline; assignment monitor tersebut baru dipulihkan ketika monitornya kembali tersedia.
 - Saat drag manual berlangsung, kunci layout dijeda sementara agar tidak melawan gerakan pengguna.
 - Mode system tray: minimize atau klik X menyembunyikan UI, tetapi engine zona/hotkey tetap aktif.
-- Menu tray menyediakan **Buka Bagi Layar**, **Workspace Cepat**, **Target Monitor Hotkey**, toggle **Zona Drag**, toggle **Hotkey Ctrl+Alt+1…9**, **Mulai bersama Windows**, dan **Keluar Bagi Layar**.
+- Menu tray menyediakan **Buka Bagi Layar**, **Workspace Cepat**, **Target Monitor Hotkey**, toggle **Zona Drag**, toggle **Hotkey Ctrl+Alt+1…9**, **Pulihkan workspace otomatis saat mulai**, **Mulai bersama Windows**, dan **Keluar Bagi Layar**.
 - **Workspace Cepat** dapat memulihkan workspace tersimpan langsung dari tray.
+- **Pulihkan workspace otomatis saat mulai** menunggu aplikasi lain terbuka lalu mencoba mengembalikan workspace aktif secara bertahap.
+- Auto-restore mulai setelah sekitar 3 detik dan mencoba ulang setiap 5 detik sampai maksimal 18 kali (sekitar 90 detik).
 - Opsi **Mulai bersama Windows** memakai startup per-user, tidak membutuhkan administrator atau installer.
 - Saat auto-start, Bagi Layar langsung masuk tray menggunakan argumen `--tray` sehingga jendela utama tidak mengganggu saat login Windows.
 - Single-instance: Bagi Layar mencegah dua engine/tray/hotkey berjalan bersamaan.
 - Jika EXE dibuka lagi saat aplikasi sudah aktif, instance lama dibawa ke depan; auto-start `--tray` kedua keluar diam-diam.
 - Workspace dan preferensi tray disimpan secara portable di folder `config/` di sebelah EXE.
-- Preferensi toggle zona/hotkey diingat dalam `config/settings.ini`.
+- Preferensi toggle zona/hotkey/auto-restore diingat dalam `config/settings.ini`.
 - Workspace disimpan dalam `config/workspace.json`.
 - Simpan dan pulihkan banyak workspace.
 - UI Bahasa Indonesia.
-- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor/system-tray/auto-start/single-instance/portable-config, tes engine layout, lalu build portable Windows.
+- Workflow GitHub Actions: validasi source/UI/overlay/multi-monitor/system-tray/auto-start/single-instance/portable-config/auto-restore, tes engine layout, lalu build portable Windows.
 
 ## Cara pakai multi-monitor
 
@@ -60,7 +63,7 @@ Contoh konfigurasi:
 
 Saat berpindah tab monitor, pengaturan monitor sebelumnya tetap tersimpan di memori workspace. Tekan **Simpan Workspace** untuk menyimpan seluruh konfigurasi monitor dan assignment jendela secara permanen.
 
-Saat **Pulihkan Workspace** ditekan, Bagi Layar mencoba mengembalikan jendela ke monitor dan slot masing-masing. Workspace format lama tetap dibaca dan dimigrasikan sebagai konfigurasi monitor aktif.
+Saat **Pulihkan Workspace** ditekan, Bagi Layar mencoba mengembalikan jendela ke monitor dan slot masing-masing. Workspace format lama tetap dibaca dan dimigrasikan sebagai konfigurasi monitor aktif. Monitor yang sedang offline dilewati agar jendelanya tidak salah masuk ke monitor lain.
 
 ## Mode system tray
 
@@ -76,10 +79,19 @@ Pada Windows yang memiliki system tray:
    - memilih **Target Monitor Hotkey**;
    - mengaktifkan/nonaktifkan **Zona Drag**;
    - mengaktifkan/nonaktifkan **Hotkey Ctrl+Alt+1…9**;
+   - mengaktifkan/nonaktifkan **Pulihkan workspace otomatis saat mulai**;
    - mengaktifkan/nonaktifkan **Mulai bersama Windows**;
    - benar-benar keluar melalui **Keluar Bagi Layar**.
 
 Jika system tray tidak tersedia, perilaku close kembali normal dan aplikasi tidak memaksa berjalan di background.
+
+## Pulihkan workspace otomatis saat mulai
+
+Aktifkan **Pulihkan workspace otomatis saat mulai** dari menu tray jika susunan terakhir ingin dikembalikan setiap kali Bagi Layar dijalankan.
+
+Bagi Layar menunggu sekitar 3 detik sebelum percobaan pertama agar Chrome, Explorer, editor, atau aplikasi lain punya waktu untuk terbuka. Jika belum semua jendela workspace ditemukan, Bagi Layar mencoba lagi setiap 5 detik, maksimal 18 percobaan (sekitar 90 detik).
+
+Jika semua jendela sudah ditemukan sebelum batas tersebut, retry berhenti otomatis. Jika hanya sebagian yang ditemukan, jendela yang tersedia tetap dipulihkan dan sisanya dapat dipulihkan nanti melalui **Workspace Cepat**. Monitor tersimpan yang sedang offline tidak dihitung sebagai target aktif dan tidak dialihkan paksa ke Monitor 1.
 
 ## Single-instance
 
@@ -92,7 +104,7 @@ Jika `Bagi-Layar.exe` dijalankan lagi secara manual saat aplikasi sudah aktif, p
 Build portable selalu membawa folder `config/` di sebelah `Bagi-Layar.exe`.
 
 - `config/workspace.json` menyimpan workspace, konfigurasi monitor, dan assignment jendela.
-- `config/settings.ini` menyimpan preferensi seperti Zona Drag dan Hotkey Global.
+- `config/settings.ini` menyimpan preferensi seperti Zona Drag, Hotkey Global, dan Auto-Restore Workspace.
 - File konfigurasi runtime tidak dimasukkan ke Git; file dibuat otomatis saat aplikasi digunakan.
 - Jika versi lama sudah memiliki `workspace.json` di AppData, Bagi Layar mencoba menyalinnya otomatis ke folder `config/` saat pertama kali memakai versi portable baru.
 - Jika folder aplikasi berada di lokasi yang tidak bisa ditulis, aplikasi otomatis memakai AppData sebagai fallback agar tetap bisa berjalan.
@@ -105,7 +117,7 @@ Aktifkan **Mulai bersama Windows** dari menu klik kanan ikon tray. Bagi Layar me
 
 Karena aplikasi bersifat portable, auto-start menunjuk ke lokasi `Bagi-Layar.exe` saat opsi tersebut diaktifkan. Jika folder portable dipindahkan, nonaktifkan lalu aktifkan lagi **Mulai bersama Windows** agar lokasi startup diperbarui.
 
-Saat Windows login, aplikasi dipanggil dengan `--tray`: UI utama tidak langsung dibuka, tetapi engine multi-monitor, zona drag, hotkey, dan Kunci Layout dapat tetap berjalan di background.
+Saat Windows login, aplikasi dipanggil dengan `--tray`: UI utama tidak langsung dibuka, tetapi engine multi-monitor, zona drag, hotkey, Kunci Layout, dan bila diaktifkan Auto-Restore Workspace dapat tetap berjalan di background.
 
 ## Cara pakai cepat
 
@@ -119,7 +131,8 @@ Saat Windows login, aplikasi dipanggil dengan `--tray`: UI utama tidak langsung 
    - double-click jendela untuk memasukkannya ke slot kosong pertama;
    - tekan `Ctrl+Alt+1` sampai `Ctrl+Alt+9` untuk memindahkan jendela aktif langsung ke slot terkait pada monitor aktif;
    - saat UI berada di tray, pilih **Target Monitor Hotkey** untuk mengganti monitor tujuan;
-   - pilih **Workspace Cepat** untuk memulihkan susunan tanpa membuka UI utama.
+   - pilih **Workspace Cepat** untuk memulihkan susunan tanpa membuka UI utama;
+   - aktifkan **Pulihkan workspace otomatis saat mulai** jika susunan ingin kembali sendiri setelah login Windows.
 6. Tekan **Simpan Workspace** jika seluruh susunan multi-monitor ingin digunakan lagi.
 
 Hotkey yang slotnya tidak tersedia pada layout monitor aktif akan diabaikan dan statusnya ditampilkan di bagian bawah aplikasi.
