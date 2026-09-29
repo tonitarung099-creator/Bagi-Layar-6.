@@ -2,7 +2,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from app.sol_app_window import AppMainWindow, MultiMonitorDragZoneController
+from app.final_window import AppMainWindow, MultiMonitorDragZoneController
 from app.auto_restore import StartupWorkspaceRestorer
 from app.fonts import preferred_ui_font
 from app.hotkeys import HotkeyController

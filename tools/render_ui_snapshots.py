@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.final_window import AppMainWindow
 from app.fonts import preferred_ui_font
-from app.sol_app_window import AppMainWindow
 from app.sol_theme import STYLE
 
 
@@ -48,6 +48,7 @@ def visual_fixture(win: AppMainWindow) -> None:
     win.monitor_row.addWidget(add)
     win.monitor_row.addStretch()
 
+    win.preview.set_monitor_aspect(1920, 1080)
     win._select_layout(6)
     win.margin_spin.setValue(16)
     win.gap_spin.setValue(12)
