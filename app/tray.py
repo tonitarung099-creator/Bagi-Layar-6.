@@ -4,6 +4,7 @@ from PySide6.QtCore import QEvent, QObject, QSettings, QTimer, Qt
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from .paths import config_file
 from .startup import IS_WINDOWS as STARTUP_WINDOWS, is_startup_enabled, set_startup_enabled
 
 
@@ -16,7 +17,11 @@ class TrayController(QObject):
         self.window = window
         self.hotkeys = hotkeys
         self.zones = zones
-        self.settings = QSettings("ToniTools", "Bagi Layar")
+        self.settings = QSettings(
+            str(config_file("settings.ini")),
+            QSettings.Format.IniFormat,
+            self,
+        )
         self._quitting = False
         self._notice_shown = False
 
@@ -168,7 +173,9 @@ class TrayController(QObject):
             slot_count = "?"
             if hasattr(self.window, "_profile_for_monitor"):
                 try:
-                    slot_count = str(self.window._profile_for_monitor(index).get("layout_count", "?"))
+                    slot_count = str(
+                        self.window._profile_for_monitor(index).get("layout_count", "?")
+                    )
                 except Exception:
                     pass
             action = QAction(
@@ -178,7 +185,9 @@ class TrayController(QObject):
             action.setCheckable(True)
             action.setChecked(index == selected)
             action.triggered.connect(
-                lambda _checked=False, monitor_index=index: self._select_hotkey_monitor(monitor_index)
+                lambda _checked=False, monitor_index=index: self._select_hotkey_monitor(
+                    monitor_index
+                )
             )
             self.monitor_menu.addAction(action)
 
@@ -198,6 +207,7 @@ class TrayController(QObject):
     def _set_zones_enabled(self, enabled: bool) -> None:
         enabled = bool(enabled)
         self.settings.setValue("zone_enabled", enabled)
+        self.settings.sync()
         if self.zones is not None:
             self.zones.set_enabled(enabled)
         if hasattr(self.window, "status_label"):
@@ -208,6 +218,7 @@ class TrayController(QObject):
     def _set_hotkeys_enabled(self, enabled: bool) -> None:
         enabled = bool(enabled)
         self.settings.setValue("hotkeys_enabled", enabled)
+        self.settings.sync()
         if self.hotkeys is not None:
             self.hotkeys.set_enabled(enabled)
         if hasattr(self.window, "status_label"):
@@ -224,7 +235,9 @@ class TrayController(QObject):
         if set_startup_enabled(enabled):
             if hasattr(self.window, "status_label"):
                 self.window.status_label.setText(
-                    "Mulai bersama Windows aktif" if enabled else "Mulai bersama Windows nonaktif"
+                    "Mulai bersama Windows aktif"
+                    if enabled
+                    else "Mulai bersama Windows nonaktif"
                 )
             return
 
@@ -233,7 +246,9 @@ class TrayController(QObject):
         self.startup_action.setChecked(not enabled)
         self.startup_action.blockSignals(False)
         if hasattr(self.window, "status_label"):
-            self.window.status_label.setText("Gagal mengubah pengaturan mulai bersama Windows")
+            self.window.status_label.setText(
+                "Gagal mengubah pengaturan mulai bersama Windows"
+            )
 
     def show_window(self) -> None:
         self.window.showNormal()
@@ -286,4 +301,5 @@ class TrayController(QObject):
             self.window.removeEventFilter(self)
         except Exception:
             pass
+        self.settings.sync()
         self.tray.hide()
